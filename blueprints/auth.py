@@ -29,9 +29,8 @@ def obtener_ruta_redireccion(usuario):
     if usuario.rol.nombre == 'Admin':
         return url_for('admin.panel')
     
-    # Próximamente crearemos una vista para los funcionarios
-    # Por ahora, si es funcionario, podemos mandarlo al login o a un "en construcción"
-    return url_for('auth.login') 
+    # Todos los demás (Funcionarios) van al Dashboard Principal
+    return url_for('dashboard.index')
 
 # --- RUTAS DE AUTENTICACIÓN ---
 @auth_bp.route('/login', methods=['GET', 'POST'])

@@ -57,12 +57,18 @@ def create_app():
     from blueprints.admin import admin_bp
     app.register_blueprint(admin_bp)
     
+    from blueprints.dashboard import dashboard_bp
+    app.register_blueprint(dashboard_bp)
+    
     # En el futuro agregaremos: app.register_blueprint(clinica_bp), etc.
 
     # Ruta raíz redirige al login
     @app.route('/')
     def index():
-        return redirect(url_for('auth.login')) 
+        from flask_login import current_user
+        if current_user.is_authenticated:
+            return redirect(url_for('dashboard.index'))
+        return redirect(url_for('auth.login'))
     
     # --- ERRORES Y CACHÉ ---
     @app.errorhandler(CSRFError)
