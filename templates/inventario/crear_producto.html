@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Crear Producto{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto my-12 bg-white p-8 rounded-xl shadow-lg">
+    <div class="border-b pb-4 mb-8">
+        <h2 class="text-2xl font-bold text-gray-800">Registrar Producto</h2>
+        <p class="text-gray-500 text-sm mt-1">Carga un nuevo artículo al catálogo disponible para la Óptica.</p>
+    </div>
+
+    <form method="POST" class="space-y-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div>
+                <label for="codigo" class="block text-sm font-bold text-gray-700 mb-1">Código de Barra / Identificador</label>
+                <input type="text" name="codigo" id="codigo" value="{{ datos_previos.codigo if datos_previos else '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition font-mono" placeholder="Ej: ARM-001" required>
+            </div>
+            <div>
+                <label for="categoria_id" class="block text-sm font-bold text-gray-700 mb-1">Categoría (Nomenclatura)</label>
+                <select name="categoria_id" id="categoria_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white font-medium" required>
+                    <option value="" disabled selected>Selecciona una opción</option>
+                    {% for cat in categorias %}
+                        <option value="{{ cat.id }}" {% if datos_previos and datos_previos.categoria_id == cat.id|string %}selected{% endif %}>{{ cat.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div>
+            <label for="descripcion" class="block text-sm font-bold text-gray-700 mb-1">Descripción del Producto</label>
+            <input type="text" name="descripcion" id="descripcion" value="{{ datos_previos.descripcion if datos_previos else '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" placeholder="Ej: Armazón Metálico Azul Flex" required>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div>
+                <label for="precio" class="block text-sm font-bold text-gray-700 mb-1">Precio Unitario ($)</label>
+                <input type="number" step="0.01" name="precio" id="precio" value="{{ datos_previos.precio if datos_previos else '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" placeholder="0" required>
+            </div>
+            <div>
+                <label for="stock" class="block text-sm font-bold text-gray-700 mb-1">Stock Inicial</label>
+                <input type="number" name="stock" id="stock" value="{{ datos_previos.stock if datos_previos else '0' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" required>
+            </div>
+            <div>
+                <label for="stock_minimo" class="block text-sm font-bold text-gray-700 mb-1">Stock Mínimo (Alerta)</label>
+                <input type="number" name="stock_minimo" id="stock_minimo" value="{{ datos_previos.stock_minimo if datos_previos else '5' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" required>
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-4 pt-6 border-t border-gray-100 mt-8">
+            <a href="{{ url_for('inventario.listar_productos') }}" class="px-6 py-2 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition">Cancelar</a>
+            <button type="submit" class="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg shadow-md hover:bg-blue-700 transition">Cargar al Inventario</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

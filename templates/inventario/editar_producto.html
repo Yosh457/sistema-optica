@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Editar Producto{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto my-12 bg-white p-8 rounded-xl shadow-lg">
+    <div class="border-b pb-4 mb-8">
+        <h2 class="text-2xl font-bold text-gray-800">Modificar Artículo</h2>
+        <p class="text-gray-500 text-sm mt-1">Editando la ficha del item: <span class="text-blue-600 font-mono font-bold">{{ producto.codigo }}</span></p>
+    </div>
+
+    <form id="edit-user-form" method="POST" class="space-y-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div>
+                <label for="codigo" class="block text-sm font-bold text-gray-700 mb-1">Código de Barra / Identificador</label>
+                <input type="text" name="codigo" id="codigo" value="{{ producto.codigo }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono" required>
+            </div>
+            <div>
+                <label for="categoria_id" class="block text-sm font-bold text-gray-700 mb-1">Categoría (Nomenclatura)</label>
+                <select name="categoria_id" id="categoria_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white font-medium" required>
+                    {% for cat in categorias %}
+                        <option value="{{ cat.id }}" {% if producto.categoria_id == cat.id %}selected{% endif %}>{{ cat.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div>
+            <label for="descripcion" class="block text-sm font-bold text-gray-700 mb-1">Descripción del Producto</label>
+            <input type="text" name="descripcion" id="descripcion" value="{{ producto.descripcion }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div>
+                <label for="precio" class="block text-sm font-bold text-gray-700 mb-1">Precio Unitario ($)</label>
+                <input type="number" step="0.01" name="precio" id="precio" value="{{ producto.precio }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+            </div>
+            <div>
+                <label for="stock" class="block text-sm font-bold text-gray-700 mb-1">Stock Actual</label>
+                <input type="number" name="stock" id="stock" value="{{ producto.stock }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+            </div>
+            <div>
+                <label for="stock_minimo" class="block text-sm font-bold text-gray-700 mb-1">Stock Mínimo (Alerta)</label>
+                <input type="number" name="stock_minimo" id="stock_minimo" value="{{ producto.stock_minimo }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-4 pt-6 border-t border-gray-100 mt-8">
+            <a href="{{ url_for('inventario.listar_productos') }}" class="px-6 py-2 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition">Cancelar</a>
+            <button type="submit" class="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg shadow-md hover:bg-blue-700 transition">Guardar Cambios</button>
+        </div>
+    </form>
+</div>
+
+<div id="confirmation-modal" class="fixed inset-0 z-50 items-center justify-center hidden bg-black bg-opacity-50 backdrop-blur-sm flex">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 m-4 text-center transform transition-all scale-100">
+        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 mb-4">
+            <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        </div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">Confirmar Modificación</h3>
+        <p class="text-sm text-gray-600 mb-6">¿Estás seguro de que deseas actualizar los precios o el stock de este artículo?</p>
+        <div class="flex justify-center gap-3">
+            <button id="cancel-save" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition">Cancelar</button>
+            <button id="confirm-save" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">Sí, Guardar</button>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/modal_handler.js') }}"></script>
+{% endblock %}

@@ -60,7 +60,8 @@ def create_app():
     from blueprints.dashboard import dashboard_bp
     app.register_blueprint(dashboard_bp)
     
-    # En el futuro agregaremos: app.register_blueprint(clinica_bp), etc.
+    from blueprints.inventario import inventario_bp
+    app.register_blueprint(inventario_bp)
 
     # Ruta raíz redirige al login
     @app.route('/')
