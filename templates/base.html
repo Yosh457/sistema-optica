@@ -43,7 +43,7 @@
                 <div class="flex items-center space-x-8 h-12 text-sm font-medium">
                     <a href="{{ url_for('dashboard.index') }}" class="hover:text-blue-200 transition {% if request.endpoint == 'dashboard.index' %}border-b-2 border-white pb-1{% endif %}">Inicio</a>
                     
-                    <a href="#" class="text-gray-300 hover:text-white transition cursor-not-allowed">Pacientes y Recetas</a>
+                    <a href="{{ url_for('clinica.listar_pacientes') }}" class="hover:text-blue-200 transition {% if 'clinica' in request.endpoint %}border-b-2 border-white pb-1{% endif %}">Pacientes y Recetas</a>
                     <a href="{{ url_for('inventario.listar_productos') }}" class="hover:text-blue-200 transition {% if 'inventario' in request.endpoint %}border-b-2 border-white pb-1{% endif %}">Inventario</a>
                     <a href="#" class="text-gray-300 hover:text-white transition cursor-not-allowed">Órdenes de Trabajo</a>
                     

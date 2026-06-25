@@ -9,13 +9,12 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <a href="#" class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-8 border-t-4 border-blue-500 flex flex-col items-center text-center group cursor-not-allowed opacity-80 hover:opacity-100">
+        <a href="{{ url_for('clinica.listar_pacientes') }}" class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-8 border-t-4 border-blue-500 flex flex-col items-center text-center group">
             <div class="bg-blue-50 text-blue-600 p-5 rounded-full mb-4 group-hover:scale-110 transition-transform">
                 <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
             </div>
             <h2 class="text-xl font-bold text-gray-800 mb-2">Pacientes y Recetas</h2>
             <p class="text-gray-500 text-sm">Gestionar fichas clínicas, historial y registrar medidas oftalmológicas.</p>
-            <span class="mt-4 text-xs font-semibold text-blue-500 bg-blue-50 px-3 py-1 rounded-full">Próximamente</span>
         </a>
 
         <a href="{{ url_for('inventario.listar_productos') }}" class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-8 border-t-4 border-green-500 flex flex-col items-center text-center group opacity-80 hover:opacity-100">
