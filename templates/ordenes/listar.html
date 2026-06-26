@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Órdenes de Trabajo{% endblock %}
+{% from '_macros.html' import render_pagination %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto my-12 space-y-8 px-4 sm:px-0">
+    <div class="bg-white p-8 rounded-xl shadow-lg">
+        <div class="flex justify-between items-center mb-6 border-b pb-4 flex-wrap gap-4">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-800">Órdenes de Trabajo</h2>
+                <p class="text-gray-500 text-sm">Listado histórico de lentes en fabricación y entregas.</p>
+            </div>
+            <a href="{{ url_for('ordenes.buscar_paciente') }}" class="btn btn-primary">+ Nueva Orden de Trabajo</a>
+        </div>
+
+        <form method="get" class="bg-gray-50 p-4 rounded-lg mb-6 grid grid-cols-1 md:grid-cols-3 gap-4 items-end border">
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Buscar (Nº Orden / Paciente):</label>
+                <input type="text" name="busqueda" value="{{ busqueda }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Estado del Trabajo:</label>
+                <select name="estado" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 bg-white">
+                    <option value="">Todos</option>
+                    <option value="Pendiente" {% if estado_filtro == 'Pendiente' %}selected{% endif %}>Pendiente</option>
+                    <option value="Entregado" {% if estado_filtro == 'Entregado' %}selected{% endif %}>Entregado</option>
+                    <option value="Anulado" {% if estado_filtro == 'Anulado' %}selected{% endif %}>Anulado</option>
+                </select>
+            </div>
+            <div class="flex gap-2">
+                <a href="{{ url_for('ordenes.listar_ordenes') }}" class="btn btn-secondary w-1/3 text-center">Limpiar</a>
+                <button type="submit" class="btn btn-primary w-2/3">Filtrar</button>
+            </div>
+        </form>
+
+        <div class="overflow-x-auto rounded-lg border">
+            <table class="min-w-full bg-white divide-y divide-gray-200">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="py-3 px-4 text-left text-xs font-bold uppercase text-gray-500">Nº Trabajo</th>
+                        <th class="py-3 px-4 text-left text-xs font-bold uppercase text-gray-500">Fecha Creación</th>
+                        <th class="py-3 px-4 text-left text-xs font-bold uppercase text-gray-500">Paciente (RUT)</th>
+                        <th class="py-3 px-4 text-right text-xs font-bold uppercase text-gray-500">Valor Total</th>
+                        <th class="py-3 px-4 text-center text-xs font-bold uppercase text-gray-500">Estado</th>
+                        <th class="py-3 px-4 text-center text-xs font-bold uppercase text-gray-500">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for o in pagination.items %}
+                    <tr class="hover:bg-gray-50 transition">
+                        <td class="py-3 px-4 font-bold text-gray-800">#{{ o.id }}</td>
+                        <td class="py-3 px-4 text-sm text-gray-600">{{ o.fecha_creacion.strftime('%d-%m-%Y %H:%M') }}</td>
+                        <td class="py-3 px-4 text-sm">
+                            <div class="font-semibold text-gray-900">{{ o.paciente.nombre_completo }}</div>
+                            <div class="text-xs font-mono text-gray-500">{{ o.paciente.rut }}</div>
+                        </td>
+                        <td class="py-3 px-4 text-right text-sm font-bold text-gray-800">${{ "{:,.0f}".format(o.total)|replace(",", ".") }}</td>
+                        <td class="py-3 px-4 text-center">
+                            <span class="px-2 py-0.5 text-xs font-bold rounded-full 
+                                {% if o.estado == 'Pendiente' %} bg-amber-100 text-amber-800
+                                {% elif o.estado == 'Entregado' %} bg-green-100 text-green-800
+                                {% else %} bg-red-100 text-red-800 {% endif %}">
+                                {{ o.estado }}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 text-center flex justify-center gap-3">
+                            <a href="{{ url_for('ordenes.generar_pdf', id=o.id) }}" target="_blank" class="text-blue-600 hover:text-blue-900 font-semibold text-sm">🖨️ PDF</a>
+                            
+                            {% if o.estado == 'Pendiente' %}
+                            <form action="{{ url_for('ordenes.cambiar_estado', id=o.id) }}" method="POST" class="inline m-0">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <input type="hidden" name="nuevo_estado" value="Entregado"/>
+                                <button type="submit" class="text-green-600 hover:text-green-900 font-semibold text-sm">Entregar</button>
+                            </form>
+                            <form action="{{ url_for('ordenes.cambiar_estado', id=o.id) }}" method="POST" class="inline m-0">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <input type="hidden" name="nuevo_estado" value="Anulado"/>
+                                <button type="submit" class="text-red-600 hover:text-red-900 font-semibold text-sm" onclick="return confirm('¿Anular orden? Se devolverán los productos a stock.')">Anular</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center py-10 text-gray-500 bg-gray-50">No hay órdenes de trabajo registradas.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {{ render_pagination(pagination, 'ordenes.listar_ordenes') }}
+    </div>
+</div>
+{% endblock %}

@@ -147,7 +147,7 @@ def toggle_producto(id):
 @inventario_bp.route('/categorias', methods=['GET', 'POST'])
 @login_required
 def gestionar_categorias():
-    """Muestra e inserta categorías (Nomenclaturas) en una sola vista distribuida."""
+    """Muestra e inserta categorías (Nomenclaturas) con paginación de base de datos."""
     if request.method == 'POST':
         nombre = request.form.get('nombre', '').strip()
         
@@ -161,8 +161,11 @@ def gestionar_categorias():
             flash('Nueva categoría registrada con éxito.', 'success')
             return redirect(url_for('inventario.gestionar_categorias'))
 
-    todas_categorias = CategoriaProducto.query.order_by(CategoriaProducto.nombre).all()
-    return render_template('inventario/categorias.html', categorias=todas_categorias)
+    # Cambiamos .all() por .paginate para evitar listas infinitas en la UI
+    page = request.args.get('page', 1, type=int)
+    pagination = CategoriaProducto.query.order_by(CategoriaProducto.nombre).paginate(page=page, per_page=10, error_out=False)
+    
+    return render_template('inventario/categorias.html', pagination=pagination)
 
 @inventario_bp.route('/categorias/toggle/<int:id>', methods=['POST'])
 @login_required

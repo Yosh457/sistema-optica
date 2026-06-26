@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Gestionar Categorías{% endblock %}
+{% from '_macros.html' import render_pagination %}
 
 {% block content %}
 <div class="max-w-7xl mx-auto my-12 px-4 sm:px-0">
@@ -37,7 +38,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200">
-                        {% for cat in categorias %}
+                        {% for cat in pagination.items %}
                         <tr class="hover:bg-gray-50 transition">
                             <td class="py-3 px-6 text-sm font-mono text-gray-500">{{ cat.id }}</td>
                             <td class="py-3 px-6 text-sm font-bold text-gray-800">{{ cat.nombre }}</td>
@@ -65,6 +66,8 @@
                     </tbody>
                 </table>
             </div>
+            
+            {{ render_pagination(pagination, 'inventario.gestionar_categorias') }}
         </div>
     </div>
 </div>

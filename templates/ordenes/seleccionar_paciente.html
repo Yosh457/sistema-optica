@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Nueva Orden - Paso 1{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto my-12 bg-white p-8 rounded-xl shadow-lg">
+    <div class="border-b pb-4 mb-8">
+        <h2 class="text-2xl font-bold text-gray-800">Nueva Orden de Trabajo (Paso 1)</h2>
+        <p class="text-gray-500 text-sm mt-1">Busque al paciente por RUT para vincular su ficha médica.</p>
+    </div>
+
+    <form method="GET" class="flex gap-4 mb-8 bg-gray-50 p-4 rounded-lg border">
+        <input type="text" name="busqueda" value="{{ busqueda }}" placeholder="Ingrese RUT completo (Ej: 12345678-9)..." class="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+        <button type="submit" class="btn btn-primary px-6 font-bold">Buscar Paciente</button>
+    </form>
+
+    {% if paciente %}
+    <div class="space-y-6">
+        <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+            <h3 class="font-bold text-gray-800 text-lg">{{ paciente.nombre_completo }}</h3>
+            <p class="text-sm font-mono text-gray-600">RUT: {{ paciente.rut }}</p>
+        </div>
+
+        <h4 class="text-md font-bold text-gray-700 border-b pb-2">Seleccione la receta a fabricar:</h4>
+        
+        <div class="space-y-4">
+            {% for r in recetas %}
+            <div class="border rounded-lg p-4 bg-white hover:border-blue-500 transition flex justify-between items-center">
+                <div>
+                    <span class="font-bold text-gray-800">Receta Oftalmológica del {{ r.fecha_receta.strftime('%d-%m-%Y') }}</span>
+                    <p class="text-xs text-gray-500 mt-1">OD: {{ r.od_esfera or '0.00' }} / OI: {{ r.oi_esfera or '0.00' }} | DP: {{ r.distancia_pupilar or '-' }}</p>
+                </div>
+                <a href="{{ url_for('ordenes.formulario_orden', paciente_id=paciente.id, receta_id=r.id) }}" class="btn btn-primary text-xs bg-green-600 border-green-600 hover:bg-green-700">Usar esta Receta</a>
+            </div>
+            {% else %}
+            <div class="p-6 bg-yellow-50 rounded-lg border border-yellow-100 text-yellow-800 text-sm">
+                ⚠️ El paciente no posee recetas registradas en su ficha clínica.
+            </div>
+            {% endfor %}
+
+            <div class="pt-4 border-t flex justify-end">
+                <a href="{{ url_for('ordenes.formulario_orden', paciente_id=paciente.id) }}" class="btn btn-secondary text-sm bg-gray-700 hover:bg-gray-800">
+                    Continuar sin receta (Venta Directa / Accesorios) &rarr;
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

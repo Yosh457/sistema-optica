@@ -65,6 +65,9 @@ def create_app():
     
     from blueprints.clinica import clinica_bp
     app.register_blueprint(clinica_bp)
+    
+    from blueprints.ordenes import ordenes_bp
+    app.register_blueprint(ordenes_bp)
 
     # Ruta raíz redirige al login
     @app.route('/')
