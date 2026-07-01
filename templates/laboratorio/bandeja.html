@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Bandeja de Laboratorio{% endblock %}
+
+{% block content %}
+<div class="max-w-[1400px] mx-auto my-8 px-4">
+    <div class="border-b pb-4 mb-8 flex justify-between items-center">
+        <div>
+            <h2 class="text-3xl font-bold text-gray-800">Taller y Laboratorio Óptico</h2>
+            <p class="text-gray-500 text-sm mt-1">Gestión técnica, armado y biselado de cristales.</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+        
+        <div class="bg-gray-100/50 rounded-xl p-4 border border-gray-200">
+            <div class="flex items-center justify-between mb-4 pb-2 border-b-2 border-yellow-400">
+                <h3 class="font-bold text-gray-700 uppercase tracking-wide text-sm">Pendientes / Faltantes</h3>
+                <span class="bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded-full">{{ pendientes|length }}</span>
+            </div>
+            <div class="space-y-4">
+                {% for r in pendientes %}
+                <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 {% if r.estado_id == 2 %}border-orange-500{% else %}border-yellow-400{% endif %} hover:shadow-md transition">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs font-bold text-gray-500">Receta #{{ r.id }}</span>
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded {% if r.estado_id == 2 %}bg-orange-100 text-orange-800{% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                            {{ r.estado.nombre }}
+                        </span>
+                    </div>
+                    <h4 class="font-bold text-gray-800">{{ r.paciente.nombre_completo }}</h4>
+                    <p class="text-xs text-gray-500 mb-3">Ingreso: {{ r.fecha_registro.strftime('%d-%m-%Y %H:%M') }}</p>
+                    
+                    <ul class="text-xs text-gray-600 mb-4 list-disc pl-4 space-y-1">
+                        {% for prod in r.productos_asociados %}
+                        <li>{{ prod.cantidad }}x {{ prod.producto.nombre }}</li>
+                        {% endfor %}
+                    </ul>
+
+                    <form action="{{ url_for('laboratorio.cambiar_estado', id=r.id) }}" method="POST" class="mt-2 pt-3 border-t">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <div class="flex gap-2">
+                            <select name="nuevo_estado_id" class="text-xs border rounded p-1 w-full bg-gray-50">
+                                {% for e in estados %}
+                                    <option value="{{ e.id }}" {% if e.id == r.estado_id %}selected{% endif %}>Mover a: {{ e.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white p-1 rounded text-xs font-bold px-3">→</button>
+                        </div>
+                    </form>
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-400 text-center py-4 italic">No hay recetas pendientes.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="bg-gray-100/50 rounded-xl p-4 border border-gray-200">
+            <div class="flex items-center justify-between mb-4 pb-2 border-b-2 border-blue-500">
+                <h3 class="font-bold text-gray-700 uppercase tracking-wide text-sm">En Fabricación (Taller)</h3>
+                <span class="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded-full">{{ fabricacion|length }}</span>
+            </div>
+            <div class="space-y-4">
+                {% for r in fabricacion %}
+                <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-blue-500 hover:shadow-md transition">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs font-bold text-gray-500">Receta #{{ r.id }}</span>
+                    </div>
+                    <h4 class="font-bold text-gray-800">{{ r.paciente.nombre_completo }}</h4>
+                    <p class="text-xs text-blue-600 font-medium mb-3 mt-1">⚙️ Trabajando en los lentes...</p>
+                    
+                    <form action="{{ url_for('laboratorio.cambiar_estado', id=r.id) }}" method="POST" class="mt-2 pt-3 border-t">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="nuevo_estado_id" value="4"> <button type="submit" class="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg text-xs font-bold uppercase tracking-wide flex justify-center items-center gap-2 transition">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            Marcar como Lista
+                        </button>
+                    </form>
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-400 text-center py-4 italic">El taller está libre.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="bg-gray-100/50 rounded-xl p-4 border border-gray-200">
+            <div class="flex items-center justify-between mb-4 pb-2 border-b-2 border-green-500">
+                <h3 class="font-bold text-gray-700 uppercase tracking-wide text-sm">Listas para Entrega</h3>
+                <span class="bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded-full">{{ listas|length }}</span>
+            </div>
+            <div class="space-y-4">
+                {% for r in listas %}
+                <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-green-500 hover:shadow-md transition opacity-80">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs font-bold text-gray-500">Receta #{{ r.id }}</span>
+                    </div>
+                    <h4 class="font-bold text-gray-800 line-through">{{ r.paciente.nombre_completo }}</h4>
+                    <p class="text-xs text-green-600 font-bold mb-1 mt-1">✓ Lentes terminados.</p>
+                    <p class="text-[10px] text-gray-400 uppercase">A la espera del área comercial</p>
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-400 text-center py-4 italic">No hay órdenes terminadas.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

@@ -68,6 +68,9 @@ def create_app():
     
     from blueprints.ordenes import ordenes_bp
     app.register_blueprint(ordenes_bp)
+    
+    from blueprints.laboratorio import laboratorio_bp
+    app.register_blueprint(laboratorio_bp)
 
     # Ruta raíz redirige al login
     @app.route('/')

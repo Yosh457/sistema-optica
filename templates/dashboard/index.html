@@ -8,29 +8,38 @@
         <p class="text-gray-500 mt-2">Selecciona el módulo al que deseas ingresar.</p>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <a href="{{ url_for('clinica.listar_pacientes') }}" class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-8 border-t-4 border-blue-500 flex flex-col items-center text-center group">
-            <div class="bg-blue-50 text-blue-600 p-5 rounded-full mb-4 group-hover:scale-110 transition-transform">
-                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        
+        <a href="{{ url_for('clinica.listar_pacientes') }}" class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6 border-t-4 border-blue-500 flex flex-col items-center text-center group">
+            <div class="bg-blue-50 text-blue-600 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
             </div>
-            <h2 class="text-xl font-bold text-gray-800 mb-2">Pacientes y Recetas</h2>
-            <p class="text-gray-500 text-sm">Gestionar fichas clínicas, historial y registrar medidas oftalmológicas.</p>
+            <h2 class="text-lg font-bold text-gray-800 mb-1">Clínica (Recetas)</h2>
+            <p class="text-gray-500 text-xs">Fichas, historial y medidas oftalmológicas.</p>
         </a>
 
-        <a href="{{ url_for('inventario.listar_productos') }}" class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-8 border-t-4 border-green-500 flex flex-col items-center text-center group opacity-80 hover:opacity-100">
-            <div class="bg-green-50 text-green-600 p-5 rounded-full mb-4 group-hover:scale-110 transition-transform">
-                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+        <a href="{{ url_for('laboratorio.bandeja_trabajo') }}" class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6 border-t-4 border-amber-500 flex flex-col items-center text-center group">
+            <div class="bg-amber-50 text-amber-600 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
             </div>
-            <h2 class="text-xl font-bold text-gray-800 mb-2">Inventario de Óptica</h2>
-            <p class="text-gray-500 text-sm">Control de stock de armazones, cristales, accesorios y categorías.</p>
+            <h2 class="text-lg font-bold text-gray-800 mb-1">Taller y Laboratorio</h2>
+            <p class="text-gray-500 text-xs">Bandeja de cristales, armado y listado de entregas.</p>
         </a>
 
-        <a href="{{ url_for('ordenes.listar_ordenes') }}" class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-8 border-t-4 border-purple-500 flex flex-col items-center text-center group opacity-80 hover:opacity-100">
-            <div class="bg-purple-50 text-purple-600 p-5 rounded-full mb-4 group-hover:scale-110 transition-transform">
-                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+        <a href="{{ url_for('inventario.listar_productos') }}" class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6 border-t-4 border-green-500 flex flex-col items-center text-center group">
+            <div class="bg-green-50 text-green-600 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
             </div>
-            <h2 class="text-xl font-bold text-gray-800 mb-2">Órdenes de Trabajo</h2>
-            <p class="text-gray-500 text-sm">Generar entregas, registrar ventas y visualizar las boletas o PDFs.</p>
+            <h2 class="text-lg font-bold text-gray-800 mb-1">Inventario</h2>
+            <p class="text-gray-500 text-xs">Control de stock de armazones, cristales y accesorios.</p>
+        </a>
+
+        <a href="{{ url_for('ordenes.listar_ordenes') }}" class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6 border-t-4 border-purple-500 flex flex-col items-center text-center group">
+            <div class="bg-purple-50 text-purple-600 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            </div>
+            <h2 class="text-lg font-bold text-gray-800 mb-1">Caja Comercial (OT)</h2>
+            <p class="text-gray-500 text-xs">Entregas, cobros, descuento de stock y tickets PDF.</p>
         </a>
     </div>
 </div>
