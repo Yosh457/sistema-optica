@@ -26,7 +26,7 @@ def listar_productos():
     if busqueda:
         query = query.filter(
             or_(Producto.codigo.ilike(f'%{busqueda}%'),
-                Producto.descripcion.ilike(f'%{busqueda}%'))
+                Producto.nombre.ilike(f'%{busqueda}%'))
         )
     
     # Filtro por categoría
@@ -34,7 +34,7 @@ def listar_productos():
         query = query.filter(Producto.categoria_id == int(categoria_filtro))
 
     # Paginación (10 productos por página)
-    pagination = query.order_by(Producto.descripcion).paginate(page=page, per_page=10, error_out=False)
+    pagination = query.order_by(Producto.nombre).paginate(page=page, per_page=10, error_out=False)
     
     # Catálogo de categorías activas para el select del filtro
     categorias = CategoriaProducto.query.filter_by(activo=True).order_by(CategoriaProducto.nombre).all()
@@ -59,8 +59,9 @@ def crear_producto():
     categorias = CategoriaProducto.query.filter_by(activo=True).order_by(CategoriaProducto.nombre).all()
 
     if request.method == 'POST':
-        codigo = request.form.get('codigo', '').strip()
-        descripcion = request.form.get('descripcion', '').strip()
+        codigo_raw = request.form.get('codigo', '').strip()
+        codigo = codigo_raw if codigo_raw else None  # Guardar como NULL si está vacío
+        nombre = request.form.get('nombre', '').strip()
         precio = request.form.get('precio')
         stock = request.form.get('stock')
         stock_minimo = request.form.get('stock_minimo')
@@ -73,7 +74,7 @@ def crear_producto():
 
         nuevo_producto = Producto(
             codigo=codigo,
-            descripcion=descripcion,
+            nombre=nombre,
             precio=precio,
             stock=stock,
             stock_minimo=stock_minimo,
@@ -84,7 +85,7 @@ def crear_producto():
         try:
             db.session.add(nuevo_producto)
             db.session.commit()
-            registrar_log_sistema("Creación Producto", f"Se registró el producto {codigo} - {descripcion}")
+            registrar_log_sistema("Creación Producto", f"Se registró el producto {codigo or 'Sin Código'} - {nombre}")
             flash('Producto creado exitosamente en el inventario.', 'success')
             return redirect(url_for('inventario.listar_productos'))
         except Exception as e:
@@ -101,16 +102,18 @@ def editar_producto(id):
     categorias = CategoriaProducto.query.filter_by(activo=True).order_by(CategoriaProducto.nombre).all()
 
     if request.method == 'POST':
-        codigo_nuevo = request.form.get('codigo', '').strip()
+        codigo_raw = request.form.get('codigo', '').strip()
+        codigo_nuevo = codigo_raw if codigo_raw else None
         
-        # Validación de duplicidad excluyendo el registro actual
-        existente = Producto.query.filter_by(codigo=codigo_nuevo).first()
-        if existente and existente.id != id:
-            flash('Error: Ese código de barras ya pertenece a otro artículo.', 'danger')
-            return render_template('inventario/editar_producto.html', producto=producto, categorias=categorias)
-
+        # Validación de duplicidad excluyendo el registro actual (solo si hay código)
+        if codigo_nuevo:
+            existente = Producto.query.filter_by(codigo=codigo_nuevo).first()
+            if existente and existente.id != id:
+                flash('Error: Ese código de barras ya pertenece a otro artículo.', 'danger')
+                return render_template('inventario/editar_producto.html', producto=producto, categorias=categorias)
+            
         producto.codigo = codigo_nuevo
-        producto.descripcion = request.form.get('descripcion', '').strip()
+        producto.nombre = request.form.get('nombre', '').strip()
         producto.precio = request.form.get('precio')
         producto.stock = request.form.get('stock')
         producto.stock_minimo = request.form.get('stock_minimo')
@@ -118,7 +121,7 @@ def editar_producto(id):
 
         try:
             db.session.commit()
-            registrar_log_sistema("Edición Producto", f"Se actualizó el producto ID {id} ({producto.codigo})")
+            registrar_log_sistema("Edición Producto", f"Se actualizó el producto ID {id} ({producto.nombre})")
             flash('Producto actualizado correctamente.', 'success')
             return redirect(url_for('inventario.listar_productos'))
         except Exception as e:
@@ -136,8 +139,8 @@ def toggle_producto(id):
     db.session.commit()
     
     estado = "activado" if producto.activo else "desactivado"
-    registrar_log_sistema("Cambio Estado Producto", f"El producto {producto.codigo} fue {estado}.")
-    flash(f"Producto {producto.codigo} {estado} correctamente.", "success")
+    registrar_log_sistema("Cambio Estado Producto", f"El producto {producto.nombre} fue {estado}.")
+    flash(f"Producto {producto.nombre} {estado} correctamente.", "success")
     return redirect(url_for('inventario.listar_productos'))
 
 # ==============================================================================

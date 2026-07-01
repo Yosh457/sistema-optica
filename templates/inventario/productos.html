@@ -32,7 +32,7 @@
 
         <form method="get" class="bg-gray-50 p-4 rounded-lg mb-6 grid grid-cols-1 md:grid-cols-3 gap-4 items-end border">
             <div>
-                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Buscar (Código/Descripción):</label>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Buscar (Nombre o Código):</label>
                 <input type="text" name="busqueda" value="{{ busqueda }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500">
             </div>
             <div>
@@ -54,8 +54,7 @@
             <table class="min-w-full bg-white divide-y divide-gray-200">
                 <thead class="bg-gray-100">
                     <tr>
-                        <th class="py-3 px-4 text-left text-xs font-bold uppercase text-gray-500">Código</th>
-                        <th class="py-3 px-4 text-left text-xs font-bold uppercase text-gray-500">Descripción</th>
+                        <th class="py-3 px-4 text-left text-xs font-bold uppercase text-gray-500">Nombre del Producto</th>
                         <th class="py-3 px-4 text-left text-xs font-bold uppercase text-gray-500">Categoría</th>
                         <th class="py-3 px-4 text-right text-xs font-bold uppercase text-gray-500">Precio Unitario</th>
                         <th class="py-3 px-4 text-center text-xs font-bold uppercase text-gray-500">Stock Actual</th>
@@ -67,8 +66,12 @@
                     {% for p in pagination.items %}
                     {% set es_critico = p.stock <= p.stock_minimo %}
                     <tr class="hover:bg-gray-50 transition {% if es_critico and p.activo %}bg-red-50/50{% endif %}">
-                        <td class="py-3 px-4 font-mono text-sm font-bold text-gray-700">{{ p.codigo }}</td>
-                        <td class="py-3 px-4 text-sm font-medium text-gray-900">{{ p.descripcion }}</td>
+                        <td class="py-3 px-4">
+                            <div class="text-sm font-medium text-gray-900">{{ p.nombre }}</div>
+                            {% if p.codigo %}
+                            <div class="text-xs font-mono text-gray-500 mt-1">Cód: {{ p.codigo }}</div>
+                            {% endif %}
+                        </td>
                         <td class="py-3 px-4 text-sm text-gray-600">{{ p.categoria.nombre }}</td>
                         <td class="py-3 px-4 text-right text-sm font-semibold text-gray-800">${{ "{:,.0f}".format(p.precio)|replace(",", ".") }}</td>
                         <td class="py-3 px-4 text-center">
@@ -88,7 +91,7 @@
                             <a href="{{ url_for('inventario.editar_producto', id=p.id) }}" class="btn btn-secondary text-xs">Editar</a>
                             <form action="{{ url_for('inventario.toggle_producto', id=p.id) }}" method="POST" class="inline m-0">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                <button type="submit" class="btn {% if p.activo %}btn-danger{% else %}btn-primary{% endif %} text-xs w-24">
+                                <button type="submit" class="btn {% if p.activo %}btn-danger{% else %}btn-primary{% endif %} text-xs">
                                     {{ 'Desactivar' if p.activo else 'Activar' }}
                                 </button>
                             </form>
@@ -96,7 +99,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="7" class="text-center py-10 text-gray-500 bg-gray-50">No hay productos cargados en el sistema.</td>
+                        <td colspan="6" class="text-center py-10 text-gray-500 bg-gray-50">No hay productos que coincidan con la búsqueda.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
