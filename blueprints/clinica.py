@@ -4,7 +4,7 @@ from flask_login import login_required, current_user
 from sqlalchemy import or_
 from datetime import datetime
 
-from models import db, Paciente, RecetaOftalmica
+from models import db, Paciente, RecetaOftalmica, Producto, RecetaProducto, HistorialEstado
 from utils import registrar_log_sistema
 
 clinica_bp = Blueprint('clinica', __name__, template_folder='../templates', url_prefix='/clinica')
@@ -127,6 +127,8 @@ def ficha_paciente(id):
 @login_required
 def crear_receta(id):
     paciente = Paciente.query.get_or_404(id)
+    # Traemos todos los productos activos para el selector dinámico de la cotización
+    productos_disponibles = Producto.query.filter_by(activo=True).order_by(Producto.nombre).all()
 
     if request.method == 'POST':
         fecha_str = request.form.get('fecha_receta')
@@ -135,32 +137,74 @@ def crear_receta(id):
             fecha_receta = datetime.strptime(fecha_str, '%Y-%m-%d').date()
         except ValueError:
             flash('Error: Formato de fecha inválido.', 'danger')
-            return render_template('clinica/crear_receta.html', paciente=paciente, hoy=datetime.today().strftime('%Y-%m-%d'))
+            return render_template('clinica/crear_receta.html', paciente=paciente, productos=productos_disponibles, hoy=datetime.today().strftime('%Y-%m-%d'))
 
-        nueva_receta = RecetaOftalmica(
-            fecha_receta=fecha_receta,
-            od_esfera=request.form.get('od_esfera', '').strip(),
-            od_cilindro=request.form.get('od_cilindro', '').strip(),
-            od_eje=request.form.get('od_eje', '').strip(),
-            oi_esfera=request.form.get('oi_esfera', '').strip(),
-            oi_cilindro=request.form.get('oi_cilindro', '').strip(),
-            oi_eje=request.form.get('oi_eje', '').strip(),
-            distancia_pupilar=request.form.get('distancia_pupilar', '').strip(),
-            adicion=request.form.get('adicion', '').strip(),
-            observaciones=request.form.get('observaciones', '').strip(),
-            paciente_id=paciente.id,
-            usuario_id=current_user.id
-        )
+        # Listas dinámicas del formulario de productos asociados
+        productos_ids = request.form.getlist('producto_id[]')
+        cantidades = request.form.getlist('cantidad[]')
+        observaciones_prod = request.form.getlist('observaciones_prod[]')
 
         try:
+            # REGLA DE NEGOCIO: Desactivar (quitar vigencia) a todas las recetas anteriores del paciente
+            RecetaOftalmica.query.filter_by(paciente_id=paciente.id).update({RecetaOftalmica.activa: False})
+
+            # Creamos la cabecera de la nueva receta (Nace en estado ID 1: Pendiente Laboratorio)
+            nueva_receta = RecetaOftalmica(
+                fecha_receta=fecha_receta,
+                od_esfera=request.form.get('od_esfera', '').strip(),
+                od_cilindro=request.form.get('od_cilindro', '').strip(),
+                od_eje=request.form.get('od_eje', '').strip(),
+                oi_esfera=request.form.get('oi_esfera', '').strip(),
+                oi_cilindro=request.form.get('oi_cilindro', '').strip(),
+                oi_eje=request.form.get('oi_eje', '').strip(),
+                distancia_pupilar=request.form.get('distancia_pupilar', '').strip(),
+                adicion=request.form.get('adicion', '').strip(),
+                observaciones=request.form.get('observaciones', '').strip(),
+                activa=True,
+                estado_id=1, # 1: Pendiente Laboratorio
+                paciente_id=paciente.id,
+                usuario_id=current_user.id
+            )
             db.session.add(nueva_receta)
+            db.session.flush() # Forzamos la obtención del ID de la receta antes del commit final
+
+            # REGLA DE NEGOCIO: Congelación histórica de productos y cálculo de la cotización clínica
+            for p_id, cant_str, obs in zip(productos_ids, cantidades, observaciones_prod):
+                if not p_id or not cant_str: continue
+                
+                prod = Producto.query.get(int(p_id))
+                cantidad = int(cant_str)
+                subtotal = prod.precio * cantidad
+
+                asociacion = RecetaProducto(
+                    receta_id=nueva_receta.id,
+                    producto_id=prod.id,
+                    cantidad=cantidad,
+                    precio_unitario=prod.precio,
+                    subtotal=subtotal,
+                    observaciones=obs.strip() if obs else None
+                )
+                db.session.add(asociacion)
+
+            # REGLA DE NEGOCIO: Guardar registro en el Historial de Transiciones de Estado (Trazabilidad)
+            historial = HistorialEstado(
+                tipo_entidad=HistorialEstado.TIPO_RECETA,
+                entidad_id=nueva_receta.id,
+                estado_anterior_id=None, # Viene de la creación
+                estado_nuevo_id=1,       # Pasa a Pendiente Laboratorio
+                usuario_id=current_user.id,
+                observacion="Apertura automática de ficha técnica clínico-operativa."
+            )
+            db.session.add(historial)
+            
             db.session.commit()
-            registrar_log_sistema("Ingreso Receta", f"Nueva receta para paciente {paciente.rut}")
-            flash('Receta oftalmológica ingresada correctamente.', 'success')
+            registrar_log_sistema("Ingreso Receta", f"Nueva receta e insumos guardados para paciente {paciente.rut}")
+            flash('Receta oftalmológica e insumos asociados registrados con éxito.', 'success')
             return redirect(url_for('clinica.ficha_paciente', id=paciente.id))
+            
         except Exception as e:
             db.session.rollback()
-            flash(f'Error al guardar receta: {str(e)}', 'danger')
+            flash(f'Error crítico al guardar la receta: {str(e)}', 'danger')
 
     hoy = datetime.today().strftime('%Y-%m-%d')
-    return render_template('clinica/crear_receta.html', paciente=paciente, hoy=hoy)
+    return render_template('clinica/crear_receta.html', paciente=paciente, productos=productos_disponibles, hoy=hoy)
