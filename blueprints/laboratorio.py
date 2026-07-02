@@ -20,7 +20,7 @@ def bandeja_trabajo():
     recetas_fabricacion = RecetaOftalmica.query.filter_by(estado_id=3).order_by(RecetaOftalmica.fecha_modificacion.desc()).all()
     
     # 4: Lista (Esperando que caja facture y entregue)
-    recetas_listas = RecetaOftalmica.query.filter_by(estado_id=4).order_by(RecetaOftalmica.fecha_modificacion.desc()).all()
+    recetas_listas = RecetaOftalmica.query.filter_by(estado_id=4, activa=True).order_by(RecetaOftalmica.fecha_modificacion.desc()).all()
 
     # Traemos los estados para los selects de cambio de estado rápido
     estados_disponibles = EstadoReceta.query.order_by(EstadoReceta.orden).all()

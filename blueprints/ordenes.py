@@ -5,7 +5,7 @@ from sqlalchemy import or_
 import io
 
 # Modelos e Inclusiones
-from models import db, OrdenTrabajo, DetalleOrden, Paciente, RecetaOftalmica, Producto
+from models import db, OrdenTrabajo, DetalleOrden, Paciente, RecetaOftalmica, Producto, EstadoOrden, EstadoReceta, MetodoPago, HistorialEstado
 from utils import registrar_log_sistema
 
 # Configuración ReportLab para el PDF Institucional
@@ -16,13 +16,27 @@ from reportlab.lib import colors
 
 ordenes_bp = Blueprint('ordenes', __name__, template_folder='../templates', url_prefix='/ordenes')
 
+# ==============================================================================
+# CONSTANTES DE NEGOCIO (Evita IDs mágicos)
+# ==============================================================================
+ESTADO_OT_PENDIENTE = "Pendiente"
+ESTADO_OT_ENTREGADA = "Entregada"
+ESTADO_OT_ANULADA = "Anulada"
+
+ESTADO_RECETA_LISTA = "Lista"
+ESTADO_RECETA_ANULADA = "Anulada"
+
+# ==============================================================================
+# ENDPOINTS Y RUTAS DEL FLUJO
+# ==============================================================================
+
 @ordenes_bp.route('/listar')
 @login_required
 def listar_ordenes():
-    """Muestra el historial de órdenes generadas con filtros por estado y RUT."""
+    """Muestra el historial de órdenes generadas con filtros dinámicos por estado parametrizado."""
     page = request.args.get('page', 1, type=int)
     busqueda = request.args.get('busqueda', '').strip()
-    estado_filtro = request.args.get('estado', '')
+    estado_filtro = request.args.get('estado_id', '')
 
     query = OrdenTrabajo.query.join(Paciente)
 
@@ -33,18 +47,28 @@ def listar_ordenes():
                 OrdenTrabajo.id == busqueda)
         )
     
-    if estado_filtro:
-        query = query.filter(OrdenTrabajo.estado == estado_filtro)
+    if estado_filtro and estado_filtro.isdigit():
+        query = query.filter(OrdenTrabajo.estado_id == int(estado_filtro))
 
     pagination = query.order_by(OrdenTrabajo.fecha_creacion.desc()).paginate(page=page, per_page=10, error_out=False)
+    
+    # Cargamos los estados comerciales para el filtro de la UI
+    estados_ot = EstadoOrden.query.order_by(EstadoOrden.orden).all()
+    # Cargamos los métodos de pago para los modales de entrega rápidos de la lista
+    metodos_pago = MetodoPago.query.filter_by(activo=True).order_by(MetodoPago.nombre).all()
 
-    return render_template('ordenes/listar.html', pagination=pagination, busqueda=busqueda, estado_filtro=estado_filtro)
+    return render_template('ordenes/listar.html', 
+                           pagination=pagination, 
+                           busqueda=busqueda, 
+                           estados_ot=estados_ot,
+                           metodos_pago=metodos_pago,
+                           estado_filtro=estado_filtro)
 
 
 @ordenes_bp.route('/crear/buscar-paciente')
 @login_required
 def buscar_paciente():
-    """Paso 1 del flujo: Buscar paciente y desplegar sus recetas clínicas."""
+    """Paso 1 del flujo: Buscar paciente y desplegar sus recetas y estados."""
     busqueda = request.args.get('busqueda', '').strip()
     paciente = None
     recetas = []
@@ -62,7 +86,7 @@ def buscar_paciente():
 @ordenes_bp.route('/crear/formulario', methods=['GET', 'POST'])
 @login_required
 def formulario_orden():
-    """Paso 2 del flujo: Reúne al paciente, su receta y procesa la baja de stock."""
+    """Paso 2 del flujo: Reúne al paciente, autocompleta la receta y genera la OT en estado Pendiente."""
     paciente_id = request.args.get('paciente_id', type=int)
     receta_id = request.args.get('receta_id', type=int) # Puede ser None (venta directa)
 
@@ -72,7 +96,7 @@ def formulario_orden():
 
     paciente = Paciente.query.get_or_404(paciente_id)
     receta = RecetaOftalmica.query.get(receta_id) if receta_id else None
-    productos_disponibles = Producto.query.filter_by(activo=True).order_by(Producto.descripcion).all()
+    productos_disponibles = Producto.query.filter_by(activo=True).order_by(Producto.nombre).all()
 
     if request.method == 'POST':
         # Captura de listas enviadas desde el formulario dinámico
@@ -84,10 +108,18 @@ def formulario_orden():
             flash('Error: Debe añadir al menos un artículo a la orden.', 'danger')
             return redirect(url_for('ordenes.formulario_orden', paciente_id=paciente_id, receta_id=receta_id))
 
+        # Buscamos dinámicamente el estado inicial 'Pendiente' en la base de datos
+        estado_pendiente = EstadoOrden.query.filter_by(nombre=ESTADO_OT_PENDIENTE).first()
+        if not estado_pendiente:
+            flash('Error de configuración: El estado comercial Pendiente no existe.', 'danger')
+            return redirect(url_for('ordenes.buscar_paciente'))
+
+        # Preparamos el registro de la orden
         total_orden = 0
         detalles_a_guardar = []
 
         # --- VALIDACIÓN DE STOCK EN MEMORIA ANTES DE GUARDAR ---
+        # Estructuración y cálculo del carrito (Inmutable/Congelado)
         for p_id, cant_str in zip(productos_ids, cantidades):
             if not p_id or not cant_str: continue
             
@@ -95,18 +127,11 @@ def formulario_orden():
             cantidad = int(cant_str)
 
             if cantidad <= 0:
-                flash(f'Error: La cantidad para {prod.descripcion} debe ser mayor a 0.', 'danger')
-                return redirect(url_for('ordenes.formulario_orden', paciente_id=paciente_id, receta_id=receta_id))
-
-            if prod.stock < cantidad:
-                flash(f'⚠️ STOCK INSUFICIENTE: Solo quedan {prod.stock} unidades de "{prod.descripcion}". Operación cancelada.', 'danger')
+                flash(f'Error: La cantidad para {prod.nombre} debe ser mayor a 0.', 'danger')
                 return redirect(url_for('ordenes.formulario_orden', paciente_id=paciente_id, receta_id=receta_id))
 
             subtotal = prod.precio * cantidad
             total_orden += subtotal
-
-            # Decrepamos el stock físicamente
-            prod.stock -= cantidad
 
             # Preparamos el registro del detalle
             detalle = DetalleOrden(
@@ -117,10 +142,10 @@ def formulario_orden():
             )
             detalles_a_guardar.append(detalle)
 
-        # Creación de la cabecera de la Orden
+        # Creación de la cabecera (Nace como Pendiente, NO descuenta stock aún)
         nueva_orden = OrdenTrabajo(
             total=total_orden,
-            estado='Pendiente',
+            estado_id=estado_pendiente.id,
             observaciones=observaciones,
             usuario_id=current_user.id,
             paciente_id=paciente.id,
@@ -132,9 +157,22 @@ def formulario_orden():
 
         try:
             db.session.add(nueva_orden)
+            db.session.flush() # Forzamos obtención del ID comercial de la OT
+
+            # Auditoría en historial_estados
+            historial = HistorialEstado(
+                tipo_entidad=HistorialEstado.TIPO_ORDEN,
+                entidad_id=nueva_orden.id,
+                estado_anterior_id=None,
+                estado_nuevo_id=estado_pendiente.id,
+                usuario_id=current_user.id,
+                observacion="Orden de Trabajo pre-generada y documentada en espera del paciente."
+            )
+            db.session.add(historial)
+            
             db.session.commit()
-            registrar_log_sistema("Generación Orden", f"Orden ID {nueva_orden.id} creada para paciente RUT {paciente.rut}. Total: ${total_orden}")
-            flash(f'Orden de Trabajo Nº {nueva_orden.id} generada con éxito.', 'success')
+            registrar_log_sistema("Generación Orden", f"OT Nº {nueva_orden.id} creada para paciente RUT {paciente.rut} en estado Pendiente.")
+            flash(f'Orden de Trabajo Nº {nueva_orden.id} registrada exitosamente.', 'success')
             return redirect(url_for('ordenes.listar_ordenes'))
         except Exception as e:
             db.session.rollback()
@@ -143,25 +181,153 @@ def formulario_orden():
     return render_template('ordenes/crear_orden.html', paciente=paciente, receta=receta, productos=productos_disponibles)
 
 
-@ordenes_bp.route('/cambiar-estado/<int:id>', methods=['POST'])
+@ordenes_bp.route('/entregar/<int:id>', methods=['POST'])
 @login_required
-def cambiar_estado(id):
-    """Permite cambiar el estado (Entregado / Anulado). Si se anula, se devuelve el stock."""
+def entregar_orden(id):
+    """
+    ÁREA DE CAJA: Registra el pago del paciente, descuenta el stock 
+    físicamente del inventario y realiza la entrega formal del lente.
+    ADEMÁS: Cierra el estado de la Receta asociada para limpiar el Kanban.
+    """
     orden = OrdenTrabajo.query.get_or_404(id)
-    nuevo_estado = request.form.get('nuevo_estado')
+    metodo_pago_id = request.form.get('metodo_pago_id')
+    observacion = request.form.get('observacion', '').strip()
 
-    if nuevo_estado == 'Anulado' and orden.estado != 'Anulado':
-        # Devolución de stock al inventario
-        for detalle in orden.detalles:
-            detalle.producto.stock += detalle.cantidad
-        orden.estado = 'Anulado'
-        flash(f'Orden Nº {id} anulada correctamente. Stock devuelto a bodega.', 'info')
-    elif nuevo_estado == 'Entregado':
-        orden.estado = 'Entregado'
-        flash(f'Orden Nº {id} marcada como entregada al paciente.', 'success')
+    estado_pendiente = EstadoOrden.query.filter_by(nombre=ESTADO_OT_PENDIENTE).first()
+    estado_entregada = EstadoOrden.query.filter_by(nombre=ESTADO_OT_ENTREGADA).first()
 
-    db.session.commit()
-    registrar_log_sistema("Cambio Estado Orden", f"Orden ID {id} pasó a estado: {nuevo_estado}")
+    if orden.estado_id != estado_pendiente.id:
+        flash('Error: Solo se pueden entregar órdenes que se encuentren en estado Pendiente.', 'danger')
+        return redirect(url_for('ordenes.listar_ordenes'))
+
+    if not metodo_pago_id:
+        flash('Error: Debe seleccionar un método de pago válido.', 'danger')
+        return redirect(url_for('ordenes.listar_ordenes'))
+
+    # --- VALIDACIÓN DE STOCK EN TIEMPO REAL ANTES DE LA REBAJA DE BODEGA ---
+    for d in orden.detalles:
+        if d.producto.stock < d.cantidad:
+            flash(f'⚠️ IMPOSIBLE ENTREGAR: Stock insuficiente de "{d.producto.nombre}" en bodega (Disponible: {d.producto.stock}). Compras pendientes.', 'danger')
+            return redirect(url_for('ordenes.listar_ordenes'))
+
+    # Descuento físico de inventario de óptica
+    for d in orden.detalles:
+        d.producto.stock -= d.cantidad
+
+    # Transición de estados comerciales y financieros de la OT
+    estado_anterior = orden.estado_id
+    orden.estado_id = estado_entregada.id
+    orden.metodo_pago_id = int(metodo_pago_id)
+    orden.modificado_por = current_user.id
+    orden.fecha_modificacion = db.func.now()
+
+    # Registro de auditoría polimórfica (Orden)
+    historial_ot = HistorialEstado(
+        tipo_entidad=HistorialEstado.TIPO_ORDEN,
+        entidad_id=orden.id,
+        estado_anterior_id=estado_anterior,
+        estado_nuevo_id=estado_entregada.id,
+        usuario_id=current_user.id,
+        observacion=observacion if observacion else "Pago recibido y entrega conforme de lentes realizada."
+    )
+    db.session.add(historial_ot)
+    
+    # --- NUEVO: CERRAR LA RECETA CLÍNICA ASOCIADA PARA LIMPIAR EL KANBAN ---
+    if orden.receta_id:
+        receta = orden.receta
+        estado_receta_lista = EstadoReceta.query.filter_by(nombre=ESTADO_RECETA_LISTA).first()
+        
+        # Como las recetas no tienen un estado "Entregada", simplemente las sacaremos de la vista (haciéndolas inactivas)
+        # o las dejaremos así pero indicando que ya están finalizadas. Para esto, en vez de un estado nuevo,
+        # simplemente la marcamos como no activa.
+        receta.activa = False
+        receta.modificado_por = current_user.id
+        receta.fecha_modificacion = db.func.now()
+
+        historial_receta = HistorialEstado(
+            tipo_entidad=HistorialEstado.TIPO_RECETA,
+            entidad_id=receta.id,
+            estado_anterior_id=receta.estado_id,
+            estado_nuevo_id=receta.estado_id, # El estado es el mismo (Lista) pero deja de estar activa
+            usuario_id=current_user.id,
+            observacion=f"Receta cerrada y entregada al paciente mediante Orden de Trabajo #{orden.id}."
+        )
+        db.session.add(historial_receta)
+
+    try:
+        db.session.commit()
+        registrar_log_sistema("Entrega Orden", f"OT Nº {orden.id} entregada y pagada. Inventario rebajado.")
+        flash(f'¡Éxito! Orden Nº {orden.id} marcada como Entregada. Ticket de caja habilitado para impresión.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al procesar la entrega en la base de datos: {str(e)}', 'danger')
+
+    return redirect(url_for('ordenes.listar_ordenes'))
+
+
+@ordenes_bp.route('/anular/<int:id>', methods=['POST'])
+@login_required
+def anular_orden(id):
+    """Permite anular una orden. Devuelve stock a bodega SOLO si la orden ya había sido entregada."""
+    orden = OrdenTrabajo.query.get_or_404(id)
+    observacion = request.form.get('observacion', '').strip()
+
+    estado_entregada = EstadoOrden.query.filter_by(nombre=ESTADO_OT_ENTREGADA).first()
+    estado_anulada = EstadoOrden.query.filter_by(nombre=ESTADO_OT_ANULADA).first()
+    estado_receta_anulada = EstadoReceta.query.filter_by(nombre=ESTADO_RECETA_ANULADA).first()
+
+    if orden.estado_id == estado_anulada.id:
+        flash('La orden ya se encuentra anulada.', 'warning')
+        return redirect(url_for('ordenes.listar_ordenes'))
+
+    # REGLA DE NEGOCIO: Si ya se había entregado, devolvemos el stock. Si era pendiente, la bodega está intacta.
+    if orden.estado_id == estado_entregada.id:
+        for d in orden.detalles:
+            d.producto.stock += d.cantidad
+
+    estado_anterior = orden.estado_id
+    orden.estado_id = estado_anulada.id
+    orden.modificado_por = current_user.id
+    orden.fecha_modificacion = db.func.now()
+
+    historial_ot = HistorialEstado(
+        tipo_entidad=HistorialEstado.TIPO_ORDEN,
+        entidad_id=orden.id,
+        estado_anterior_id=estado_anterior,
+        estado_nuevo_id=estado_anulada.id,
+        usuario_id=current_user.id,
+        observacion=f"ANULACIÓN: {observacion}" if observacion else "Orden anulada por el funcionario."
+    )
+    db.session.add(historial_ot)
+    
+    # --- NUEVO: SI ANULAMOS LA OT, TAMBIÉN ANULAMOS LA RECETA PARA QUE NO ESTORBE ---
+    if orden.receta_id and estado_receta_anulada:
+        receta = orden.receta
+        estado_anterior_receta = receta.estado_id
+        
+        receta.estado_id = estado_receta_anulada.id
+        receta.activa = False
+        receta.modificado_por = current_user.id
+        receta.fecha_modificacion = db.func.now()
+        
+        historial_receta = HistorialEstado(
+            tipo_entidad=HistorialEstado.TIPO_RECETA,
+            entidad_id=receta.id,
+            estado_anterior_id=estado_anterior_receta,
+            estado_nuevo_id=estado_receta_anulada.id,
+            usuario_id=current_user.id,
+            observacion=f"Anulada automáticamente al anular la OT #{orden.id}."
+        )
+        db.session.add(historial_receta)
+
+    try:
+        db.session.commit()
+        registrar_log_sistema("Anulación Orden", f"OT Nº {orden.id} fue anulada. Historial actualizado.")
+        flash(f'Orden de Trabajo Nº {orden.id} anulada con éxito.', 'info')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al procesar la anulación: {str(e)}', 'danger')
+
     return redirect(url_for('ordenes.listar_ordenes'))
 
 
@@ -173,6 +339,15 @@ def generar_pdf(id):
     Implementa auto-wrap nativo para descripciones largas y divisores vectoriales limpios.
     """
     orden = OrdenTrabajo.query.get_or_404(id)
+    
+    estado_entregada = EstadoOrden.query.filter_by(nombre=ESTADO_OT_ENTREGADA).first()
+    
+    # REGLA DE SEGURIDAD ARQUITECTÓNICA: Bloquear la impresión si no está pagada/entregada
+    if not estado_entregada or orden.estado_id != estado_entregada.id:
+        flash('⚠️ SEGURIDAD: No se puede emitir ni imprimir el comprobante de una Orden de Trabajo que no esté en estado Entregada.', 'danger')
+        return redirect(url_for('ordenes.listar_ordenes'))
+    
+    # --- CREACIÓN DEL LIENZO TÉRMICO ---
     buffer = io.BytesIO()
     
     # --- CONFIGURACIÓN DEL LIENZO TÉRMICO (80mm ancho) ---
@@ -273,14 +448,14 @@ def generar_pdf(id):
     
     articulos_data = [[
         Paragraph('<b>Cant</b>', cell_center_b), 
-        Paragraph('<b>Descripción del Insumo</b>', cell_left_b), 
+        Paragraph('<b>Nombre del Insumo</b>', cell_left_b), 
         Paragraph('<b>Total</b>', cell_right_b)
     ]]
     
     for d in orden.detalles:
         articulos_data.append([
             Paragraph(str(d.cantidad), cell_center),
-            Paragraph(d.producto.descripcion, cell_left), # ReportLab calculará el alto y saltos de línea automáticamente
+            Paragraph(d.producto.nombre, cell_left), # ReportLab calculará el alto y saltos de línea automáticamente
             Paragraph(f"${int(d.subtotal):,}".replace(",", "."), cell_right)
         ])
         
@@ -296,19 +471,21 @@ def generar_pdf(id):
     agregar_linea_divisoria()
     
     # ==============================================================================
-    # 5. MONTO TOTAL
+    # 5. MONTO TOTAL Y MÉTODO DE PAGO
     # ==============================================================================
     total_str = f"${int(orden.total):,}".replace(",", ".")
-    story.append(Paragraph(f"TOTAL: {total_str}", ParagraphStyle('TkTotal', fontName='Helvetica-Bold', fontSize=11, alignment=2, spaceBefore=2, spaceAfter=10)))
+    story.append(Paragraph(f"TOTAL: {total_str}", ParagraphStyle('TkTotal', fontName='Helvetica-Bold', fontSize=11, alignment=2, spaceBefore=2)))
+    if orden.metodo_pago:
+        story.append(Paragraph(f"<b>PAGO:</b> {orden.metodo_pago.nombre}", ParagraphStyle('TkPago', fontName='Helvetica', fontSize=7.5, alignment=2, spaceAfter=10)))
     
     # ==============================================================================
     # 6. PIE DE TICKET TERMINAL
     # ==============================================================================
-    story.append(Paragraph("Documento interno de control de trabajo.", subtitle_style))
+    story.append(Paragraph("Documento interno de control de caja.", subtitle_style))
     story.append(Paragraph("Unidad de TICs - Departamento de Salud Municipal", ParagraphStyle('TkFoot', fontName='Helvetica', fontSize=5.5, alignment=1, textColor=colors.gray)))
 
     # Construcción final del flujo binario
     doc.build(story)
     buffer.seek(0)
     
-    return send_file(buffer, as_attachment=False, mimetype='application/pdf', download_name=f"ticket_orden_{orden.id}.pdf")
+    return send_file(buffer, as_attachment=False, mimetype='application/pdf', download_name=f"ticket_caja_orden_{orden.id}.pdf")
