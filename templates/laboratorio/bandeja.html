@@ -3,7 +3,7 @@
 
 {% block content %}
 <div class="max-w-[1400px] mx-auto my-8 px-4">
-    <div class="border-b pb-4 mb-8 flex justify-between items-center">
+    <div class="border-b pb-4 mb-8 flex justify-between items-center flex-wrap gap-4">
         <div>
             <h2 class="text-3xl font-bold text-gray-800">Taller y Laboratorio Óptico</h2>
             <p class="text-gray-500 text-sm mt-1">Gestión técnica, armado y biselado de cristales.</p>
@@ -19,10 +19,10 @@
             </div>
             <div class="space-y-4">
                 {% for r in pendientes %}
-                <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 {% if r.estado_id == 2 %}border-orange-500{% else %}border-yellow-400{% endif %} hover:shadow-md transition">
-                    <div class="flex justify-between items-start mb-2">
+                <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 {% if r.estado.nombre == 'Esperando Stock' %}border-orange-500{% else %}border-yellow-400{% endif %} hover:shadow-md transition">
+                    <div class="flex justify-between items-start mb-2 flex-wrap gap-2">
                         <span class="text-xs font-bold text-gray-500">Receta #{{ r.id }}</span>
-                        <span class="text-xs font-semibold px-2 py-0.5 rounded {% if r.estado_id == 2 %}bg-orange-100 text-orange-800{% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                        <span class="text-[10px] font-semibold px-2 py-0.5 rounded uppercase tracking-wider {% if r.estado.nombre == 'Esperando Stock' %}bg-orange-100 text-orange-800{% else %}bg-yellow-100 text-yellow-800{% endif %}">
                             {{ r.estado.nombre }}
                         </span>
                     </div>
@@ -35,15 +35,16 @@
                         {% endfor %}
                     </ul>
 
-                    <form action="{{ url_for('laboratorio.cambiar_estado', id=r.id) }}" method="POST" class="mt-2 pt-3 border-t">
+                    <form action="{{ url_for('laboratorio.cambiar_estado', id=r.id) }}" method="POST" class="mt-2 pt-3 border-t form-cambio-estado">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div class="flex gap-2">
-                            <select name="nuevo_estado_id" class="text-xs border rounded p-1 w-full bg-gray-50">
+                            <select name="nuevo_estado_id" class="text-xs border rounded p-1 w-full bg-gray-50" required>
+                                <option value="" disabled selected>-- Cambiar Estado --</option>
                                 {% for e in estados %}
-                                    <option value="{{ e.id }}" {% if e.id == r.estado_id %}selected{% endif %}>Mover a: {{ e.nombre }}</option>
+                                    <option value="{{ e.id }}">Mover a: {{ e.nombre }}</option>
                                 {% endfor %}
                             </select>
-                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white p-1 rounded text-xs font-bold px-3">→</button>
+                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white p-1 rounded text-xs font-bold px-3 transition btn-submit">→</button>
                         </div>
                     </form>
                 </div>
@@ -67,9 +68,10 @@
                     <h4 class="font-bold text-gray-800">{{ r.paciente.nombre_completo }}</h4>
                     <p class="text-xs text-blue-600 font-medium mb-3 mt-1">⚙️ Trabajando en los lentes...</p>
                     
-                    <form action="{{ url_for('laboratorio.cambiar_estado', id=r.id) }}" method="POST" class="mt-2 pt-3 border-t">
+                    <form action="{{ url_for('laboratorio.cambiar_estado', id=r.id) }}" method="POST" class="mt-2 pt-3 border-t form-cambio-estado">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <input type="hidden" name="nuevo_estado_id" value="4"> <button type="submit" class="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg text-xs font-bold uppercase tracking-wide flex justify-center items-center gap-2 transition">
+                        <input type="hidden" name="nuevo_estado_id" value="{% for e in estados %}{% if e.nombre == 'Lista' %}{{ e.id }}{% endif %}{% endfor %}">
+                        <button type="submit" onclick="return confirm('¿Confirmas que el lente está 100% terminado y listo para entrega?')" class="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg text-xs font-bold uppercase tracking-wide flex justify-center items-center gap-2 transition btn-submit">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                             Marcar como Lista
                         </button>
@@ -94,7 +96,7 @@
                     </div>
                     <h4 class="font-bold text-gray-800 line-through">{{ r.paciente.nombre_completo }}</h4>
                     <p class="text-xs text-green-600 font-bold mb-1 mt-1">✓ Lentes terminados.</p>
-                    <p class="text-[10px] text-gray-400 uppercase">A la espera del área comercial</p>
+                    <p class="text-[10px] text-gray-400 uppercase">A la espera de facturación en el área comercial.</p>
                 </div>
                 {% else %}
                 <p class="text-sm text-gray-400 text-center py-4 italic">No hay órdenes terminadas.</p>
@@ -104,4 +106,33 @@
 
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.form-cambio-estado').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            if (this.dataset.submitted === 'true') {
+                e.preventDefault();
+                return;
+            }
+            this.dataset.submitted = 'true';
+            const submitBtn = this.querySelector('.btn-submit');
+            if (submitBtn) {
+                const originalText = submitBtn.innerHTML;
+                submitBtn.disabled = true;
+                submitBtn.classList.add('opacity-75', 'cursor-not-allowed');
+                submitBtn.innerHTML = submitBtn.textContent.includes('Marcar') ? 'Procesando...' : '...';
+                
+                // Reseteo de seguridad preventivo
+                setTimeout(() => {
+                    this.dataset.submitted = 'false';
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+                    submitBtn.innerHTML = originalText;
+                }, 5000);
+            }
+        });
+    });
+});
+</script>
 {% endblock %}

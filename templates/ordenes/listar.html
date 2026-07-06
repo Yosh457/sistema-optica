@@ -107,25 +107,29 @@
 </div>
 
 <div id="modal-pago" class="fixed inset-0 z-50 items-center justify-center hidden bg-black bg-opacity-60 backdrop-blur-sm flex">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 m-4 transform transition-all scale-100">
+    
+    <div class="absolute inset-0" onclick="cerrarModalPago()"></div>
+    
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 m-4 transform transition-all scale-100 border-t-8 border-indigo-600 relative z-10">
         <div class="flex justify-between items-center border-b pb-3 mb-4">
             <h3 class="text-xl font-bold text-gray-800">Registrar Pago y Entregar</h3>
-            <button type="button" onclick="cerrarModalPago()" class="text-gray-400 hover:text-red-500">✕</button>
+            <button type="button" onclick="cerrarModalPago()" class="text-gray-400 hover:text-red-500 font-bold text-xl">✕</button>
         </div>
         
         <form id="form-pago" method="POST" action="">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             
-            <div class="bg-indigo-50 p-4 rounded-lg border border-indigo-100 mb-6 text-center">
-                <span class="block text-xs font-bold text-indigo-800 uppercase tracking-widest mb-1">Monto a Cobrar</span>
-                <span class="text-3xl font-black text-indigo-900" id="modal-monto-total">$0</span>
+            <div class="bg-indigo-50 p-6 rounded-lg border border-indigo-100 mb-6 text-center shadow-inner">
+                <span class="block text-xs font-bold text-indigo-800 uppercase tracking-widest mb-1">Total a Cobrar al Paciente</span>
+                <span class="text-4xl font-black text-indigo-900 drop-shadow-sm" id="modal-monto-total">$0</span>
             </div>
 
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-1">Método de Pago</label>
-                    <select name="metodo_pago_id" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-indigo-500 outline-none bg-white font-bold text-gray-700" required>
-                        <option value="" disabled selected>Seleccione la forma de pago...</option>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">Seleccione Método de Pago:</label>
+                    
+                    <select id="metodo_pago_select" name="metodo_pago_id" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-indigo-600 focus:ring-0 outline-none bg-white font-bold text-gray-700 cursor-pointer shadow-sm" required>
+                        <option value="" disabled selected>-- Elija una opción --</option>
                         {% for mp in metodos_pago %}
                             <option value="{{ mp.id }}">{{ mp.nombre }}</option>
                         {% endfor %}
@@ -133,13 +137,20 @@
                 </div>
                 
                 <div class="pt-4 mt-6 border-t border-gray-200">
-                    <p class="text-xs text-gray-500 mb-4 font-medium leading-relaxed">
-                        ⚠️ Al presionar confirmar, se <span class="font-bold text-red-600">descontará el stock de bodega</span> y la OT quedará bloqueada en estado Entregada.
-                    </p>
-                    <button type="submit" class="w-full px-4 py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition shadow-lg text-lg flex items-center justify-center gap-2">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        Confirmar Pago y Entrega
-                    </button>
+                    <div class="bg-amber-50 border-l-4 border-amber-500 p-3 mb-4 rounded">
+                        <p class="text-[11px] text-amber-800 font-medium leading-relaxed">
+                            ⚠️ Al confirmar, el stock se <span class="font-bold">descontará físicamente de bodega</span> y la OT pasará a estado inmutable (Entregada).
+                        </p>
+                    </div>
+                    
+                    <div class="flex gap-3">
+                        <button type="button" onclick="cerrarModalPago()" class="w-1/3 px-4 py-3 bg-gray-100 text-gray-700 font-bold rounded-lg hover:bg-gray-200 transition">Cancelar</button>
+                        
+                        <button type="submit" id="btn-confirmar-pago" class="w-2/3 px-4 py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition shadow-md flex items-center justify-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            Registrar Pago
+                        </button>
+                    </div>
                 </div>
             </div>
         </form>
@@ -156,6 +167,7 @@ function abrirModalPago(btn) {
     const modal = document.getElementById('modal-pago');
     const form = document.getElementById('form-pago');
     const montoLabel = document.getElementById('modal-monto-total');
+    const selectPago = document.getElementById('metodo_pago_select');
     
     // 3. Configuramos la URL dinámicamente según el ID de la orden
     form.action = `/ordenes/entregar/${ordenId}`;
@@ -165,10 +177,33 @@ function abrirModalPago(btn) {
 
     // 5. Mostramos el modal
     modal.classList.remove('hidden');
+
+    // UX: Auto-focus para agilidad de caja
+    setTimeout(() => { selectPago.focus(); }, 100);
 }
 
 function cerrarModalPago() {
     document.getElementById('modal-pago').classList.add('hidden');
 }
+
+// UX: Cerrar con Escape
+document.addEventListener('keydown', function(event) {
+    if (event.key === "Escape") {
+        cerrarModalPago();
+    }
+});
+
+// UX: Evitar doble envío en caja
+document.getElementById('form-pago').addEventListener('submit', function(e) {
+    if (this.dataset.submitted === 'true') {
+        e.preventDefault();
+        return;
+    }
+    this.dataset.submitted = 'true';
+    const btn = document.getElementById('btn-confirmar-pago');
+    btn.disabled = true;
+    btn.classList.add('opacity-75', 'cursor-not-allowed');
+    btn.innerHTML = 'Procesando...';
+});
 </script>
 {% endblock %}
