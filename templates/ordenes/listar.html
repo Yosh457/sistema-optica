@@ -192,18 +192,5 @@ document.addEventListener('keydown', function(event) {
         cerrarModalPago();
     }
 });
-
-// UX: Evitar doble envío en caja
-document.getElementById('form-pago').addEventListener('submit', function(e) {
-    if (this.dataset.submitted === 'true') {
-        e.preventDefault();
-        return;
-    }
-    this.dataset.submitted = 'true';
-    const btn = document.getElementById('btn-confirmar-pago');
-    btn.disabled = true;
-    btn.classList.add('opacity-75', 'cursor-not-allowed');
-    btn.innerHTML = 'Procesando...';
-});
 </script>
 {% endblock %}

@@ -68,9 +68,11 @@ def crear_producto():
         categoria_id = request.form.get('categoria_id')
 
         # Validación de código único
-        if Producto.query.filter_by(codigo=codigo).first():
+        # CORRECCIÓN 1: Validamos unicidad SOLO si el usuario realmente ingresó un código (if codigo:)
+        if codigo and Producto.query.filter_by(codigo=codigo).first():
             flash(f'Error: El código "{codigo}" ya está asignado a otro producto.', 'danger')
-            return render_template('inventario/crear_producto.html', categories=categorias, datos_previos=request.form)
+            # CORRECCIÓN 2: Pasamos la variable correctamente como 'categorias=categorias' (antes decía categories)
+            return render_template('inventario/crear_producto.html', categorias=categorias, datos_previos=request.form)
 
         nuevo_producto = Producto(
             codigo=codigo,

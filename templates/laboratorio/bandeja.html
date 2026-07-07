@@ -35,7 +35,7 @@
                         {% endfor %}
                     </ul>
 
-                    <form action="{{ url_for('laboratorio.cambiar_estado', id=r.id) }}" method="POST" class="mt-2 pt-3 border-t form-cambio-estado">
+                    <form action="{{ url_for('laboratorio.cambiar_estado', id=r.id) }}" method="POST" class="mt-2 pt-3 border-t">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div class="flex gap-2">
                             <select name="nuevo_estado_id" class="text-xs border rounded p-1 w-full bg-gray-50" required>
@@ -44,7 +44,7 @@
                                     <option value="{{ e.id }}">Mover a: {{ e.nombre }}</option>
                                 {% endfor %}
                             </select>
-                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white p-1 rounded text-xs font-bold px-3 transition btn-submit">→</button>
+                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white p-1 rounded text-xs font-bold px-3 transition">→</button>
                         </div>
                     </form>
                 </div>
@@ -68,10 +68,11 @@
                     <h4 class="font-bold text-gray-800">{{ r.paciente.nombre_completo }}</h4>
                     <p class="text-xs text-blue-600 font-medium mb-3 mt-1">⚙️ Trabajando en los lentes...</p>
                     
-                    <form action="{{ url_for('laboratorio.cambiar_estado', id=r.id) }}" method="POST" class="mt-2 pt-3 border-t form-cambio-estado">
+                    <form action="{{ url_for('laboratorio.cambiar_estado', id=r.id) }}" method="POST" class="mt-2 pt-3 border-t">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <input type="hidden" name="nuevo_estado_id" value="{% for e in estados %}{% if e.nombre == 'Lista' %}{{ e.id }}{% endif %}{% endfor %}">
-                        <button type="submit" onclick="return confirm('¿Confirmas que el lente está 100% terminado y listo para entrega?')" class="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg text-xs font-bold uppercase tracking-wide flex justify-center items-center gap-2 transition btn-submit">
+                        
+                        <button type="button" data-receta-id="{{ r.id }}" onclick="abrirModalConfirmacion(this)" class="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg text-xs font-bold uppercase tracking-wide flex justify-center items-center gap-2 transition shadow-sm">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                             Marcar como Lista
                         </button>
@@ -107,32 +108,79 @@
     </div>
 </div>
 
+<div id="modal-confirmacion" class="fixed inset-0 z-50 items-center justify-center hidden bg-black bg-opacity-60 backdrop-blur-sm flex">
+    <div class="absolute inset-0" onclick="cerrarModalConfirmacion()"></div>
+    
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 m-4 transform transition-all scale-100 border-t-8 border-green-500 relative z-10">
+        <div class="flex justify-between items-center border-b pb-3 mb-4">
+            <h3 class="text-xl font-bold text-gray-800">Finalizar Fabricación</h3>
+            <button type="button" onclick="cerrarModalConfirmacion()" class="text-gray-400 hover:text-red-500 font-bold text-xl">✕</button>
+        </div>
+        
+        <div class="text-center mb-6 mt-4">
+            <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
+                <svg class="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            </div>
+            <p class="text-gray-600 text-sm leading-relaxed">
+                ¿Confirmas que los lentes de la receta <span id="modal-receta-id" class="font-bold text-gray-800 text-base bg-gray-100 px-2 py-0.5 rounded"></span> están <span class="font-bold">100% terminados</span> y listos para ser entregados al paciente?
+            </p>
+            <p class="text-xs text-green-600 font-bold mt-3">Esta acción trasladará la tarjeta al área comercial (Caja).</p>
+        </div>
+
+        <div class="flex gap-3 border-t border-gray-200 pt-4">
+            <button type="button" onclick="cerrarModalConfirmacion()" class="w-1/2 px-4 py-3 bg-gray-100 text-gray-700 font-bold rounded-lg hover:bg-gray-200 transition">Cancelar</button>
+            <button type="button" id="btn-confirmar-lista" class="w-1/2 px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition shadow-md">
+                Sí, Marcar Lista
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.form-cambio-estado').forEach(form => {
-        form.addEventListener('submit', function(e) {
-            if (this.dataset.submitted === 'true') {
-                e.preventDefault();
-                return;
-            }
-            this.dataset.submitted = 'true';
-            const submitBtn = this.querySelector('.btn-submit');
-            if (submitBtn) {
-                const originalText = submitBtn.innerHTML;
-                submitBtn.disabled = true;
-                submitBtn.classList.add('opacity-75', 'cursor-not-allowed');
-                submitBtn.innerHTML = submitBtn.textContent.includes('Marcar') ? 'Procesando...' : '...';
-                
-                // Reseteo de seguridad preventivo
-                setTimeout(() => {
-                    this.dataset.submitted = 'false';
-                    submitBtn.disabled = false;
-                    submitBtn.classList.remove('opacity-75', 'cursor-not-allowed');
-                    submitBtn.innerHTML = originalText;
-                }, 5000);
-            }
-        });
-    });
+// --- LÓGICA DEL MODAL DE CONFIRMACIÓN ---
+let formAEnviar = null;
+
+function abrirModalConfirmacion(btn) {
+    // Localizamos el formulario padre del botón que se hizo clic
+    formAEnviar = btn.closest('form');
+    
+    // Obtenemos el ID de la receta usando dataset
+    const recetaId = btn.dataset.recetaId;
+    
+    // Inyectamos el ID de la receta en el texto del modal
+    document.getElementById('modal-receta-id').textContent = "#" + recetaId;
+    
+    // Mostramos el modal
+    document.getElementById('modal-confirmacion').classList.remove('hidden');
+    
+    // Reiniciamos el estado del botón por si se había cancelado antes
+    const btnConfirmar = document.getElementById('btn-confirmar-lista');
+    btnConfirmar.disabled = false;
+    btnConfirmar.classList.remove('opacity-75', 'cursor-not-allowed');
+    btnConfirmar.innerHTML = 'Sí, Marcar Lista';
+    
+    // Auto-focus para poder confirmar rápido con Enter
+    setTimeout(() => { btnConfirmar.focus(); }, 100);
+}
+
+function cerrarModalConfirmacion() {
+    document.getElementById('modal-confirmacion').classList.add('hidden');
+    formAEnviar = null;
+}
+
+// Evento de confirmación en el modal
+document.getElementById('btn-confirmar-lista').addEventListener('click', function() {
+    if (formAEnviar) {
+        // Al enviar, el script global de base.html se encargará de la prevención de doble envío.
+        formAEnviar.submit();
+    }
+});
+
+// Cerrar con tecla Escape
+document.addEventListener('keydown', function(event) {
+    if (event.key === "Escape" && !document.getElementById('modal-confirmacion').classList.contains('hidden')) {
+        cerrarModalConfirmacion();
+    }
 });
 </script>
 {% endblock %}

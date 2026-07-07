@@ -4,10 +4,13 @@ from flask_login import login_required, current_user
 from sqlalchemy import or_
 from datetime import datetime
 
-from models import db, Paciente, RecetaOftalmica, Producto, RecetaProducto, HistorialEstado
+from models import db, Paciente, RecetaOftalmica, Producto, RecetaProducto, HistorialEstado, EstadoReceta
 from utils import registrar_log_sistema
 
 clinica_bp = Blueprint('clinica', __name__, template_folder='../templates', url_prefix='/clinica')
+
+# CONSTANTE DE NEGOCIO (Evita IDs Mágicos)
+ESTADO_RECETA_PENDIENTE = "Pendiente Laboratorio"
 
 # ==============================================================================
 # GESTIÓN DE PACIENTES
@@ -129,6 +132,7 @@ def crear_receta(id):
     paciente = Paciente.query.get_or_404(id)
     # Traemos todos los productos activos para el selector dinámico de la cotización
     productos_disponibles = Producto.query.filter_by(activo=True).order_by(Producto.nombre).all()
+    hoy = datetime.today().strftime('%Y-%m-%d')
 
     if request.method == 'POST':
         fecha_str = request.form.get('fecha_receta')
@@ -137,18 +141,60 @@ def crear_receta(id):
             fecha_receta = datetime.strptime(fecha_str, '%Y-%m-%d').date()
         except ValueError:
             flash('Error: Formato de fecha inválido.', 'danger')
-            return render_template('clinica/crear_receta.html', paciente=paciente, productos=productos_disponibles, hoy=datetime.today().strftime('%Y-%m-%d'))
+            return render_template('clinica/crear_receta.html', paciente=paciente, productos=productos_disponibles, hoy=hoy, datos_previos=request.form)
 
         # Listas dinámicas del formulario de productos asociados
         productos_ids = request.form.getlist('producto_id[]')
         cantidades = request.form.getlist('cantidad[]')
         observaciones_prod = request.form.getlist('observaciones_prod[]')
 
+        # ======================================================================
+        # PRE-VALIDACIONES (Integridad del Carrito de la Receta)
+        # ======================================================================
+        carrito_validado = []
+        for p_id, cant_str, obs in zip(productos_ids, cantidades, observaciones_prod):
+            if not p_id or not p_id.strip():
+                continue
+            
+            try:
+                cantidad = int(cant_str)
+            except (ValueError, TypeError):
+                flash('Error: La cantidad de los insumos debe ser un número entero.', 'danger')
+                return render_template('clinica/crear_receta.html', paciente=paciente, productos=productos_disponibles, hoy=hoy, datos_previos=request.form)
+
+            if cantidad <= 0:
+                flash('Error: La cantidad de cada producto debe ser mayor a 0.', 'danger')
+                return render_template('clinica/crear_receta.html', paciente=paciente, productos=productos_disponibles, hoy=hoy, datos_previos=request.form)
+            
+            prod = db.session.get(Producto, int(p_id))
+            if not prod:
+                flash('Error de seguridad: Se detectó un producto inválido en la solicitud.', 'danger')
+                return render_template('clinica/crear_receta.html', paciente=paciente, productos=productos_disponibles, hoy=hoy, datos_previos=request.form)
+            
+            carrito_validado.append({
+                'producto': prod,
+                'cantidad': cantidad,
+                'observacion': obs.strip() if obs else None
+            })
+
+        if not carrito_validado:
+            flash('Error Crítico: La receta clínica no puede estar vacía. Debe recetar al menos un componente (ej. marco o cristal).', 'danger')
+            return render_template('clinica/crear_receta.html', paciente=paciente, productos=productos_disponibles, hoy=hoy, datos_previos=request.form)
+
+        # Buscamos el ID dinámico del estado inicial
+        estado_pendiente = EstadoReceta.query.filter_by(nombre=ESTADO_RECETA_PENDIENTE).first()
+        if not estado_pendiente:
+            flash('Error de configuración: El estado inicial de la receta no existe en el sistema.', 'danger')
+            return render_template('clinica/crear_receta.html', paciente=paciente, productos=productos_disponibles, hoy=hoy, datos_previos=request.form)
+        
+        # ======================================================================
+        # INSERCIÓN EN LA BASE DE DATOS
+        # ======================================================================
         try:
-            # REGLA DE NEGOCIO: Desactivar (quitar vigencia) a todas las recetas anteriores del paciente
+            # Desactivar a todas las recetas anteriores del paciente
             RecetaOftalmica.query.filter_by(paciente_id=paciente.id).update({RecetaOftalmica.activa: False})
 
-            # Creamos la cabecera de la nueva receta (Nace en estado ID 1: Pendiente Laboratorio)
+            # Creamos la cabecera de la receta (Sin ID Mágico)
             nueva_receta = RecetaOftalmica(
                 fecha_receta=fecha_receta,
                 od_esfera=request.form.get('od_esfera', '').strip(),
@@ -161,37 +207,32 @@ def crear_receta(id):
                 adicion=request.form.get('adicion', '').strip(),
                 observaciones=request.form.get('observaciones', '').strip(),
                 activa=True,
-                estado_id=1, # 1: Pendiente Laboratorio
+                estado_id=estado_pendiente.id, 
                 paciente_id=paciente.id,
                 usuario_id=current_user.id
             )
             db.session.add(nueva_receta)
-            db.session.flush() # Forzamos la obtención del ID de la receta antes del commit final
+            db.session.flush()
 
-            # REGLA DE NEGOCIO: Congelación histórica de productos y cálculo de la cotización clínica
-            for p_id, cant_str, obs in zip(productos_ids, cantidades, observaciones_prod):
-                if not p_id or not cant_str: continue
-                
-                prod = Producto.query.get(int(p_id))
-                cantidad = int(cant_str)
-                subtotal = prod.precio * cantidad
-
+            # Insertamos el carrito validado
+            for item in carrito_validado:
+                subtotal = item['producto'].precio * item['cantidad']
                 asociacion = RecetaProducto(
                     receta_id=nueva_receta.id,
-                    producto_id=prod.id,
-                    cantidad=cantidad,
-                    precio_unitario=prod.precio,
+                    producto_id=item['producto'].id,
+                    cantidad=item['cantidad'],
+                    precio_unitario=item['producto'].precio,
                     subtotal=subtotal,
-                    observaciones=obs.strip() if obs else None
+                    observaciones=item['observacion']
                 )
                 db.session.add(asociacion)
 
-            # REGLA DE NEGOCIO: Guardar registro en el Historial de Transiciones de Estado (Trazabilidad)
+            # Trazabilidad
             historial = HistorialEstado(
                 tipo_entidad=HistorialEstado.TIPO_RECETA,
                 entidad_id=nueva_receta.id,
-                estado_anterior_id=None, # Viene de la creación
-                estado_nuevo_id=1,       # Pasa a Pendiente Laboratorio
+                estado_anterior_id=None,
+                estado_nuevo_id=estado_pendiente.id,
                 usuario_id=current_user.id,
                 observacion="Apertura automática de ficha técnica clínico-operativa."
             )
@@ -206,5 +247,5 @@ def crear_receta(id):
             db.session.rollback()
             flash(f'Error crítico al guardar la receta: {str(e)}', 'danger')
 
-    hoy = datetime.today().strftime('%Y-%m-%d')
-    return render_template('clinica/crear_receta.html', paciente=paciente, productos=productos_disponibles, hoy=hoy)
+    # Al cargar por primera vez (GET), datos_previos es None
+    return render_template('clinica/crear_receta.html', paciente=paciente, productos=productos_disponibles, hoy=hoy, datos_previos=None)
