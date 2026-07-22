@@ -64,7 +64,6 @@ def listar_ordenes():
                            metodos_pago=metodos_pago,
                            estado_filtro=estado_filtro)
 
-
 @ordenes_bp.route('/crear/buscar-paciente')
 @login_required
 def buscar_paciente():
@@ -81,7 +80,6 @@ def buscar_paciente():
             flash('Paciente no encontrado en los registros clínicos.', 'warning')
 
     return render_template('ordenes/seleccionar_paciente.html', paciente=paciente, recetas=recetas, busqueda=busqueda)
-
 
 @ordenes_bp.route('/crear/formulario', methods=['GET', 'POST'])
 @login_required
@@ -180,7 +178,6 @@ def formulario_orden():
 
     return render_template('ordenes/crear_orden.html', paciente=paciente, receta=receta, productos=productos_disponibles)
 
-
 @ordenes_bp.route('/entregar/<int:id>', methods=['POST'])
 @login_required
 def entregar_orden(id):
@@ -264,7 +261,6 @@ def entregar_orden(id):
 
     return redirect(url_for('ordenes.listar_ordenes'))
 
-
 @ordenes_bp.route('/anular/<int:id>', methods=['POST'])
 @login_required
 def anular_orden(id):
@@ -329,7 +325,6 @@ def anular_orden(id):
         flash(f'Error al procesar la anulación: {str(e)}', 'danger')
 
     return redirect(url_for('ordenes.listar_ordenes'))
-
 
 @ordenes_bp.route('/pdf/<int:id>')
 @login_required

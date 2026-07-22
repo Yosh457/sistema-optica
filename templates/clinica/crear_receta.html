@@ -1,137 +1,32 @@
 {% extends "base.html" %}
-{% block title %}Ingresar Receta{% endblock %}
+{% block title %}Subir Receta Digitalizada{% endblock %}
 
 {% block content %}
-<div class="max-w-5xl mx-auto my-12 bg-white p-8 rounded-xl shadow-lg space-y-8">
+<div class="max-w-3xl mx-auto my-12 bg-white p-8 rounded-xl shadow-lg space-y-8">
     <div class="border-b pb-4">
-        <h2 class="text-2xl font-bold text-gray-800">Ingresar Receta Oftalmológica</h2>
+        <h2 class="text-2xl font-bold text-gray-800">Cargar Receta Digitalizada</h2>
         <p class="text-gray-500 text-sm mt-1">Paciente: <span class="font-bold text-blue-600">{{ paciente.nombre_completo }}</span> (RUT: {{ paciente.rut }})</p>
     </div>
 
-    <form method="POST" class="space-y-8">
+    <!-- IMPORTANTÍSIMO: enctype="multipart/form-data" para permitir subida de archivos -->
+    <form method="POST" enctype="multipart/form-data" class="space-y-8">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         
-        <div>
-            <label class="block text-sm font-bold text-gray-700 mb-1">Fecha de la Receta Física</label>
-            <input type="date" name="fecha_receta" value="{{ datos_previos.fecha_receta if datos_previos else hoy }}" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none w-full max-w-xs" required>
-        </div>
-
-        <div class="border rounded-lg overflow-hidden shadow-sm">
-            <table class="w-full text-left bg-gray-50">
-                <thead class="bg-gray-200">
-                    <tr>
-                        <th class="p-3 text-sm font-bold text-gray-700 border-b w-1/4">OJO</th>
-                        <th class="p-3 text-sm font-bold text-gray-700 border-b">ESF</th>
-                        <th class="p-3 text-sm font-bold text-gray-700 border-b">CIL</th>
-                        <th class="p-3 text-sm font-bold text-gray-700 border-b">EJE</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y">
-                    <tr class="bg-white">
-                        <td class="p-3 font-bold text-gray-800 border-r bg-gray-50">DERECHO (OD)</td>
-                        <td class="p-2"><input type="text" name="od_esfera" value="{{ datos_previos.od_esfera if datos_previos else '' }}" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ej: -1.25"></td>
-                        <td class="p-2"><input type="text" name="od_cilindro" value="{{ datos_previos.od_cilindro if datos_previos else '' }}" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ej: -0.50"></td>
-                        <td class="p-2"><input type="text" name="od_eje" value="{{ datos_previos.od_eje if datos_previos else '' }}" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ej: 90°"></td>
-                    </tr>
-                    <tr class="bg-white">
-                        <td class="p-3 font-bold text-gray-800 border-r bg-gray-50">IZQUIERDO (OI)</td>
-                        <td class="p-2"><input type="text" name="oi_esfera" value="{{ datos_previos.oi_esfera if datos_previos else '' }}" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ej: -1.00"></td>
-                        <td class="p-2"><input type="text" name="oi_cilindro" value="{{ datos_previos.oi_cilindro if datos_previos else '' }}" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ej: -0.75"></td>
-                        <td class="p-2"><input type="text" name="oi_eje" value="{{ datos_previos.oi_eje if datos_previos else '' }}" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ej: 180°"></td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-                <label class="block text-sm font-bold text-gray-700 mb-1">Distancia Pupilar (DP)</label>
-                <input type="text" name="distancia_pupilar" value="{{ datos_previos.distancia_pupilar if datos_previos else '' }}" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ej: 62 mm">
-            </div>
-            <div>
-                <label class="block text-sm font-bold text-gray-700 mb-1">Adición (ADD)</label>
-                <input type="text" name="adicion" value="{{ datos_previos.adicion if datos_previos else '' }}" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ej: +2.00">
-            </div>
+        <div class="bg-blue-50 p-6 rounded-xl border border-blue-100">
+            <label class="block text-sm font-bold text-blue-900 mb-2">Archivo de la Receta</label>
+            <input type="file" name="archivo_receta" accept=".pdf,.jpg,.jpeg,.png" class="w-full px-4 py-3 bg-white border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer" required>
+            <p class="text-xs text-blue-600 mt-2">Formatos permitidos: PDF, JPG, PNG.</p>
         </div>
 
         <div>
-            <label class="block text-sm font-bold text-gray-700 mb-1">Observaciones Clínicas (Para Laboratorio)</label>
-            <textarea name="observaciones" rows="2" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ej: Altura focal 22mm, priorizar cristal orgánico...">{{ datos_previos.observaciones if datos_previos else '' }}</textarea>
-        </div>
-
-        <div class="bg-gray-50 p-6 rounded-xl border border-gray-200">
-            <h3 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Materiales e Insumos de la Receta</h3>
-            
-            <div class="overflow-x-auto">
-                <table class="w-full text-left" id="tabla-materiales">
-                    <thead>
-                        <tr class="text-xs text-gray-500 uppercase tracking-wide">
-                            <th class="pb-2 w-1/2">Artículo (Cristal / Marco / Servicio)</th>
-                            <th class="pb-2 w-1/6 text-center">Cant.</th>
-                            <th class="pb-2 w-1/3">Nota para Taller</th>
-                            <th class="pb-2 w-1/12 text-center"></th>
-                        </tr>
-                    </thead>
-                    <tbody id="contenedor-filas-materiales">
-                        <tr class="fila-material bg-white border-t relative">
-                            <td class="p-2">
-                                <select name="producto_id[]" class="w-full px-3 py-2 border rounded bg-white text-sm outline-none focus:ring-1 focus:ring-blue-500">
-                                    <option value="" disabled selected>-- Buscar producto --</option>
-                                    {% for p in productos %}
-                                        <option value="{{ p.id }}">{{ p.nombre }}</option>
-                                    {% endfor %}
-                                </select>
-                            </td>
-                            <td class="p-2 text-center">
-                                <input type="number" name="cantidad[]" value="1" min="1" class="w-16 px-2 py-2 border rounded text-center outline-none focus:ring-1 focus:ring-blue-500">
-                            </td>
-                            <td class="p-2">
-                                <input type="text" name="observaciones_prod[]" class="w-full px-3 py-2 border rounded text-sm outline-none focus:ring-1 focus:ring-blue-500" placeholder="Ej: Ojo Derecho">
-                            </td>
-                            <td class="p-2 text-center">
-                                <button type="button" class="text-red-500 hover:text-red-700 font-bold px-2 py-1" onclick="eliminarFila(this)">✕</button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <button type="button" class="mt-4 px-4 py-2 bg-gray-200 text-gray-800 text-xs font-bold rounded-lg hover:bg-gray-300 transition" onclick="agregarFila()">
-                + Añadir Otro Componente / Tratamiento
-            </button>
+            <label class="block text-sm font-bold text-gray-700 mb-1">Observaciones (Opcional)</label>
+            <textarea name="observaciones" rows="3" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white" placeholder="Ej: Receta visada por Dr. Juan Pérez..."></textarea>
         </div>
 
         <div class="flex justify-end gap-4 pt-6 border-t border-gray-100">
             <a href="{{ url_for('clinica.ficha_paciente', id=paciente.id) }}" class="btn btn-secondary">Cancelar</a>
-            <button type="submit" class="btn btn-primary bg-green-600 hover:bg-green-700 border-green-600 shadow-md">Guardar Receta Clínica</button>
+            <button type="submit" class="btn btn-primary bg-green-600 hover:bg-green-700 border-green-600 shadow-md">Subir y Guardar</button>
         </div>
     </form>
 </div>
-
-<script>
-function agregarFila() {
-    const contenedor = document.getElementById('contenedor-filas-materiales');
-    const primeraFila = document.querySelector('.fila-material');
-    
-    const nuevaFila = primeraFila.cloneNode(true);
-    nuevaFila.querySelector('select').selectedIndex = 0;
-    nuevaFila.querySelector('input[type="number"]').value = 1;
-    nuevaFila.querySelector('input[type="text"]').value = "";
-    
-    contenedor.appendChild(nuevaFila);
-}
-
-function eliminarFila(boton) {
-    const filas = document.querySelectorAll('.fila-material');
-    if (filas.length > 1) {
-        boton.closest('tr').remove();
-    } else {
-        // Si es la única fila, simplemente la limpiamos en vez de borrarla
-        const fila = boton.closest('tr');
-        fila.querySelector('select').selectedIndex = 0;
-        fila.querySelector('input[type="number"]').value = 1;
-        fila.querySelector('input[type="text"]').value = "";
-    }
-}
-</script>
 {% endblock %}

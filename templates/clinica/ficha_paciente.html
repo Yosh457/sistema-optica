@@ -4,13 +4,15 @@
 {% block content %}
 <div class="max-w-7xl mx-auto my-12 px-4 space-y-8">
     
+    <!-- Info del Paciente -->
     <div class="bg-white rounded-xl shadow-lg border-t-4 border-blue-600 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
             <h1 class="text-3xl font-bold text-gray-800">{{ paciente.nombre_completo }}</h1>
             <p class="text-gray-500 font-mono mt-1">RUT: {{ paciente.rut }}</p>
             <div class="mt-2 text-sm text-gray-600 flex gap-4 flex-wrap">
-                <span>📞 {{ paciente.telefono or 'Sin teléfono' }}</span>
-                <span>📍 {{ paciente.direccion or 'Sin dirección' }}</span>
+                <span>📞 {{ paciente.telefono }}</span>
+                <span>📍 {{ paciente.direccion }}</span>
+                <span class="font-bold text-indigo-600">🏥 {{ paciente.establecimiento.nombre if paciente.establecimiento else 'N/A' }}</span>
                 <span>📅 Registrado: {{ paciente.fecha_registro.strftime('%d-%m-%Y') }}</span>
             </div>
         </div>
@@ -20,78 +22,54 @@
         </div>
     </div>
 
+    <!-- Lista de Recetas -->
     <div class="bg-white rounded-xl shadow-lg p-6">
         <div class="flex justify-between items-center mb-6 border-b pb-4">
-            <h2 class="text-xl font-bold text-gray-800">Historial de Recetas Oftalmológicas</h2>
-            <a href="{{ url_for('clinica.crear_receta', id=paciente.id) }}" class="btn btn-primary text-sm bg-green-600 border-green-600 hover:bg-green-700">+ Ingresar Nueva Receta</a>
+            <h2 class="text-xl font-bold text-gray-800">Historial de Recetas Digitalizadas</h2>
+            <a href="{{ url_for('clinica.crear_receta', id=paciente.id) }}" class="btn btn-primary text-sm bg-green-600 border-green-600 hover:bg-green-700">+ Subir Nueva Receta</a>
         </div>
 
         {% if recetas %}
-        <div class="space-y-6">
+        <div class="space-y-4">
             {% for receta in recetas %}
-            <div class="border rounded-lg overflow-hidden">
-                
-                <div class="bg-gray-50 px-4 py-3 border-b flex justify-between items-center flex-wrap gap-2">
-                    <div class="flex items-center gap-3 flex-wrap">
-                        <span class="font-bold text-gray-700">Receta del {{ receta.fecha_receta.strftime('%d-%m-%Y') }}</span>
-                        
+            <details class="group border rounded-lg bg-gray-50 [&_summary::-webkit-details-marker]:hidden">
+                <summary class="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-100 transition">
+                    <div class="flex items-center gap-4">
+                        <span class="font-bold text-gray-800">Cargada el: {{ receta.fecha_registro.strftime('%d-%m-%Y %H:%M') }}</span>
                         {% if receta.activa %}
                             <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-blue-100 text-blue-800 uppercase tracking-wider border border-blue-200">Vigente</span>
                         {% else %}
-                            <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-gray-100 text-gray-500 uppercase tracking-wider border border-gray-200">Histórica / Cerrada</span>
+                            <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-gray-200 text-gray-600 uppercase tracking-wider border border-gray-300">Cerrada</span>
                         {% endif %}
-                        
                         <span class="px-2 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider
                             {% if receta.estado.nombre == 'Pendiente Laboratorio' %} bg-yellow-100 text-yellow-800 border border-yellow-200
-                            {% elif receta.estado.nombre == 'Esperando Stock' %} bg-orange-100 text-orange-800 border border-orange-200
-                            {% elif receta.estado.nombre == 'En Fabricación' %} bg-blue-100 text-blue-800 border border-blue-200
                             {% elif receta.estado.nombre == 'Lista' %} bg-green-100 text-green-800 border border-green-200
-                            {% else %} bg-red-100 text-red-800 border border-red-200 {% endif %}">
+                            {% else %} bg-gray-100 text-gray-800 border border-gray-200 {% endif %}">
                             {{ receta.estado.nombre }}
                         </span>
                     </div>
-                    <span class="text-xs text-gray-400 font-mono">Reg. ID: {{ receta.id }}</span>
-                </div>
+                    <span class="transition group-open:rotate-180">
+                        <svg fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="24"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </span>
+                </summary>
                 
-                <div class="p-4 overflow-x-auto">
-                    <table class="w-full text-center text-sm border-collapse">
-                        <thead>
-                            <tr class="text-gray-500 font-bold border-b">
-                                <th class="pb-2 text-left w-1/4">OJO</th>
-                                <th class="pb-2">ESFERA (ESF)</th>
-                                <th class="pb-2">CILINDRO (CIL)</th>
-                                <th class="pb-2">EJE</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr class="border-b">
-                                <td class="py-3 text-left font-bold text-gray-700">DERECHO (OD)</td>
-                                <td>{{ receta.od_esfera or '-' }}</td>
-                                <td>{{ receta.od_cilindro or '-' }}</td>
-                                <td>{{ receta.od_eje or '-' }}</td>
-                            </tr>
-                            <tr class="border-b">
-                                <td class="py-3 text-left font-bold text-gray-700">IZQUIERDO (OI)</td>
-                                <td>{{ receta.oi_esfera or '-' }}</td>
-                                <td>{{ receta.oi_cilindro or '-' }}</td>
-                                <td>{{ receta.oi_eje or '-' }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="bg-blue-50/50 p-4 border-t flex flex-wrap gap-6 text-sm text-gray-700">
-                    <div><span class="font-bold">Distancia Pupilar (DP):</span> {{ receta.distancia_pupilar or 'N/A' }}</div>
-                    <div><span class="font-bold">Adición (ADD):</span> {{ receta.adicion or 'N/A' }}</div>
+                <div class="p-4 border-t bg-white">
                     {% if receta.observaciones %}
-                    <div class="w-full mt-2"><span class="font-bold text-gray-800">Observaciones:</span> <span class="italic">{{ receta.observaciones }}</span></div>
+                    <div class="mb-4 text-sm text-gray-700">
+                        <span class="font-bold">Observaciones:</span> {{ receta.observaciones }}
+                    </div>
                     {% endif %}
+                    
+                    <a href="{{ url_for('clinica.ver_documento_receta', id=receta.id) }}" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 font-bold rounded hover:bg-indigo-100 transition border border-indigo-200">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                        Ver Documento PDF / Imagen
+                    </a>
                 </div>
-            </div>
+            </details>
             {% endfor %}
         </div>
         {% else %}
-        <div class="text-center py-12 bg-gray-50 rounded-lg">
+        <div class="text-center py-12 bg-gray-50 rounded-lg border">
             <p class="text-gray-500">Este paciente no tiene recetas ingresadas en su historial.</p>
         </div>
         {% endif %}

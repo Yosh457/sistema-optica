@@ -14,16 +14,27 @@
             </div>
             <div>
                 <label class="block text-sm font-bold text-gray-700 mb-1">Teléfono</label>
-                <input type="text" name="telefono" value="{{ datos_previos.telefono if datos_previos else '' }}" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Opcional">
+                <input type="text" name="telefono" value="{{ datos_previos.telefono if datos_previos else '' }}" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
             </div>
         </div>
         <div>
             <label class="block text-sm font-bold text-gray-700 mb-1">Nombre Completo</label>
             <input type="text" name="nombre_completo" value="{{ datos_previos.nombre_completo if datos_previos else '' }}" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
         </div>
-        <div>
-            <label class="block text-sm font-bold text-gray-700 mb-1">Dirección</label>
-            <input type="text" name="direccion" value="{{ datos_previos.direccion if datos_previos else '' }}" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Opcional">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div>
+                <label class="block text-sm font-bold text-gray-700 mb-1">Recinto Inscrito</label>
+                <select name="establecimiento_id" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white" required>
+                    <option value="" disabled selected>-- Seleccione CESFAM/CECOSF --</option>
+                    {% for est in establecimientos %}
+                        <option value="{{ est.id }}" {% if datos_previos and datos_previos.establecimiento_id == est.id|string %}selected{% endif %}>{{ est.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-bold text-gray-700 mb-1">Dirección</label>
+                <input type="text" name="direccion" value="{{ datos_previos.direccion if datos_previos else '' }}" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+            </div>
         </div>
         <div class="flex justify-end gap-4 pt-6 border-t">
             <a href="{{ url_for('clinica.listar_pacientes') }}" class="btn btn-secondary">Cancelar</a>

@@ -1,16 +1,24 @@
 # blueprints/clinica.py
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+import os
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_from_directory
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 from datetime import datetime
+from werkzeug.utils import secure_filename
 
-from models import db, Paciente, RecetaOftalmica, Producto, RecetaProducto, HistorialEstado, EstadoReceta
+from models import db, Paciente, RecetaOftalmica, Establecimiento, HistorialEstado, EstadoReceta
 from utils import registrar_log_sistema
 
 clinica_bp = Blueprint('clinica', __name__, template_folder='../templates', url_prefix='/clinica')
 
 # CONSTANTE DE NEGOCIO (Evita IDs Mágicos)
 ESTADO_RECETA_PENDIENTE = "Pendiente Laboratorio"
+
+# Extensiones permitidas para recetas
+ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # ==============================================================================
 # GESTIÓN DE PACIENTES
@@ -27,7 +35,8 @@ def listar_pacientes():
     if busqueda:
         query = query.filter(
             or_(Paciente.rut.ilike(f'%{busqueda}%'),
-                Paciente.nombre_completo.ilike(f'%{busqueda}%'))
+                Paciente.nombre_completo.ilike(f'%{busqueda}%'),
+                Paciente.telefono.ilike(f'%{busqueda}%')) # Búsqueda por teléfono añadida
         )
     
     pagination = query.order_by(Paciente.nombre_completo).paginate(page=page, per_page=10, error_out=False)
@@ -42,21 +51,29 @@ def listar_pacientes():
 @clinica_bp.route('/pacientes/crear', methods=['GET', 'POST'])
 @login_required
 def crear_paciente():
+    establecimientos = Establecimiento.query.filter_by(activo=True).order_by(Establecimiento.nombre).all()
+
     if request.method == 'POST':
-        rut = request.form.get('rut', '').strip().upper() # Estandarizamos mayúsculas
+        rut = request.form.get('rut', '').strip().upper()
         nombre_completo = request.form.get('nombre_completo', '').strip()
         telefono = request.form.get('telefono', '').strip()
         direccion = request.form.get('direccion', '').strip()
+        establecimiento_id = request.form.get('establecimiento_id')
+
+        if not establecimiento_id:
+            flash('Error: Debe seleccionar un Recinto Inscrito.', 'danger')
+            return render_template('clinica/crear_paciente.html', establecimientos=establecimientos, datos_previos=request.form)
 
         if Paciente.query.filter_by(rut=rut).first():
             flash(f'Error: El RUT {rut} ya está registrado.', 'danger')
-            return render_template('clinica/crear_paciente.html', datos_previos=request.form)
+            return render_template('clinica/crear_paciente.html', establecimientos=establecimientos, datos_previos=request.form)
 
         nuevo_paciente = Paciente(
             rut=rut,
             nombre_completo=nombre_completo,
             telefono=telefono,
             direccion=direccion,
+            establecimiento_id=establecimiento_id,
             activo=True
         )
 
@@ -70,25 +87,28 @@ def crear_paciente():
             db.session.rollback()
             flash(f'Error de BD: {str(e)}', 'danger')
 
-    return render_template('clinica/crear_paciente.html', datos_previos=None)
+    return render_template('clinica/crear_paciente.html', establecimientos=establecimientos, datos_previos=None)
 
 @clinica_bp.route('/pacientes/editar/<int:id>', methods=['GET', 'POST'])
 @login_required
 def editar_paciente(id):
     paciente = Paciente.query.get_or_404(id)
+    establecimientos = Establecimiento.query.filter_by(activo=True).order_by(Establecimiento.nombre).all()
 
     if request.method == 'POST':
         rut_nuevo = request.form.get('rut', '').strip().upper()
+        establecimiento_id = request.form.get('establecimiento_id')
         
         existente = Paciente.query.filter_by(rut=rut_nuevo).first()
         if existente and existente.id != id:
             flash('Error: Ese RUT ya está asignado a otro paciente.', 'danger')
-            return render_template('clinica/editar_paciente.html', paciente=paciente)
+            return render_template('clinica/editar_paciente.html', paciente=paciente, establecimientos=establecimientos)
 
         paciente.rut = rut_nuevo
         paciente.nombre_completo = request.form.get('nombre_completo', '').strip()
         paciente.telefono = request.form.get('telefono', '').strip()
         paciente.direccion = request.form.get('direccion', '').strip()
+        paciente.establecimiento_id = establecimiento_id
 
         try:
             db.session.commit()
@@ -99,7 +119,7 @@ def editar_paciente(id):
             db.session.rollback()
             flash(f'Error de BD: {str(e)}', 'danger')
 
-    return render_template('clinica/editar_paciente.html', paciente=paciente)
+    return render_template('clinica/editar_paciente.html', paciente=paciente, establecimientos=establecimientos)
 
 @clinica_bp.route('/pacientes/toggle/<int:id>', methods=['POST'])
 @login_required
@@ -114,98 +134,59 @@ def toggle_paciente(id):
     return redirect(url_for('clinica.listar_pacientes'))
 
 # ==============================================================================
-# FICHA CLÍNICA Y RECETAS
+# FICHA CLÍNICA Y RECETAS DIGITALIZADAS
 # ==============================================================================
 
 @clinica_bp.route('/pacientes/<int:id>/ficha')
 @login_required
 def ficha_paciente(id):
     paciente = Paciente.query.get_or_404(id)
-    # Obtenemos recetas ordenadas de la más reciente a la más antigua
-    recetas = RecetaOftalmica.query.filter_by(paciente_id=id).order_by(RecetaOftalmica.fecha_receta.desc(), RecetaOftalmica.id.desc()).all()
-    
+    # Mostramos historial ordenado por fecha de registro (ya no existe fecha_receta)
+    recetas = RecetaOftalmica.query.filter_by(paciente_id=id).order_by(RecetaOftalmica.fecha_registro.desc()).all()
     return render_template('clinica/ficha_paciente.html', paciente=paciente, recetas=recetas)
 
 @clinica_bp.route('/pacientes/<int:id>/receta/crear', methods=['GET', 'POST'])
 @login_required
 def crear_receta(id):
     paciente = Paciente.query.get_or_404(id)
-    # Traemos todos los productos activos para el selector dinámico de la cotización
-    productos_disponibles = Producto.query.filter_by(activo=True).order_by(Producto.nombre).all()
-    hoy = datetime.today().strftime('%Y-%m-%d')
 
     if request.method == 'POST':
-        fecha_str = request.form.get('fecha_receta')
+        # 1. Validación del archivo
+        if 'archivo_receta' not in request.files:
+            flash('No se seleccionó ningún archivo.', 'danger')
+            return redirect(request.url)
+            
+        file = request.files['archivo_receta']
+        if file.filename == '':
+            flash('El nombre del archivo está vacío.', 'danger')
+            return redirect(request.url)
+
+        if not (file and allowed_file(file.filename)):
+            flash('Extensión de archivo no permitida. Use PDF, JPG o PNG.', 'danger')
+            return redirect(request.url)
+
+        observaciones = request.form.get('observaciones', '').strip()
         
-        try:
-            fecha_receta = datetime.strptime(fecha_str, '%Y-%m-%d').date()
-        except ValueError:
-            flash('Error: Formato de fecha inválido.', 'danger')
-            return render_template('clinica/crear_receta.html', paciente=paciente, productos=productos_disponibles, hoy=hoy, datos_previos=request.form)
-
-        # Listas dinámicas del formulario de productos asociados
-        productos_ids = request.form.getlist('producto_id[]')
-        cantidades = request.form.getlist('cantidad[]')
-        observaciones_prod = request.form.getlist('observaciones_prod[]')
-
-        # ======================================================================
-        # PRE-VALIDACIONES (Integridad del Carrito de la Receta)
-        # ======================================================================
-        carrito_validado = []
-        for p_id, cant_str, obs in zip(productos_ids, cantidades, observaciones_prod):
-            if not p_id or not p_id.strip():
-                continue
-            
-            try:
-                cantidad = int(cant_str)
-            except (ValueError, TypeError):
-                flash('Error: La cantidad de los insumos debe ser un número entero.', 'danger')
-                return render_template('clinica/crear_receta.html', paciente=paciente, productos=productos_disponibles, hoy=hoy, datos_previos=request.form)
-
-            if cantidad <= 0:
-                flash('Error: La cantidad de cada producto debe ser mayor a 0.', 'danger')
-                return render_template('clinica/crear_receta.html', paciente=paciente, productos=productos_disponibles, hoy=hoy, datos_previos=request.form)
-            
-            prod = db.session.get(Producto, int(p_id))
-            if not prod:
-                flash('Error de seguridad: Se detectó un producto inválido en la solicitud.', 'danger')
-                return render_template('clinica/crear_receta.html', paciente=paciente, productos=productos_disponibles, hoy=hoy, datos_previos=request.form)
-            
-            carrito_validado.append({
-                'producto': prod,
-                'cantidad': cantidad,
-                'observacion': obs.strip() if obs else None
-            })
-
-        if not carrito_validado:
-            flash('Error Crítico: La receta clínica no puede estar vacía. Debe recetar al menos un componente (ej. marco o cristal).', 'danger')
-            return render_template('clinica/crear_receta.html', paciente=paciente, productos=productos_disponibles, hoy=hoy, datos_previos=request.form)
-
-        # Buscamos el ID dinámico del estado inicial
         estado_pendiente = EstadoReceta.query.filter_by(nombre=ESTADO_RECETA_PENDIENTE).first()
         if not estado_pendiente:
-            flash('Error de configuración: El estado inicial de la receta no existe en el sistema.', 'danger')
-            return render_template('clinica/crear_receta.html', paciente=paciente, productos=productos_disponibles, hoy=hoy, datos_previos=request.form)
-        
-        # ======================================================================
-        # INSERCIÓN EN LA BASE DE DATOS
-        # ======================================================================
-        try:
-            # Desactivar a todas las recetas anteriores del paciente
-            RecetaOftalmica.query.filter_by(paciente_id=paciente.id).update({RecetaOftalmica.activa: False})
+            flash('Error de configuración: El estado inicial de la receta no existe.', 'danger')
+            return redirect(request.url)
 
-            # Creamos la cabecera de la receta (Sin ID Mágico)
+        try:
+            # 2. Guardado físico del archivo (Ruta segura en la raíz del proyecto)
+            upload_folder = os.path.join(current_app.root_path, 'uploads', 'recetas')
+            os.makedirs(upload_folder, exist_ok=True)
+            
+            # Nombre seguro con RUT y timestamp para evitar sobreescritura
+            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+            safe_filename = secure_filename(f"{paciente.rut}_{timestamp}_{file.filename}")
+            file_path = os.path.join(upload_folder, safe_filename)
+            file.save(file_path)
+
+            # 3. Lógica de Base de Datos (SIN auto-desactivación de recetas anteriores)
             nueva_receta = RecetaOftalmica(
-                fecha_receta=fecha_receta,
-                od_esfera=request.form.get('od_esfera', '').strip(),
-                od_cilindro=request.form.get('od_cilindro', '').strip(),
-                od_eje=request.form.get('od_eje', '').strip(),
-                oi_esfera=request.form.get('oi_esfera', '').strip(),
-                oi_cilindro=request.form.get('oi_cilindro', '').strip(),
-                oi_eje=request.form.get('oi_eje', '').strip(),
-                distancia_pupilar=request.form.get('distancia_pupilar', '').strip(),
-                adicion=request.form.get('adicion', '').strip(),
-                observaciones=request.form.get('observaciones', '').strip(),
+                archivo_receta=safe_filename,
+                observaciones=observaciones,
                 activa=True,
                 estado_id=estado_pendiente.id, 
                 paciente_id=paciente.id,
@@ -214,38 +195,31 @@ def crear_receta(id):
             db.session.add(nueva_receta)
             db.session.flush()
 
-            # Insertamos el carrito validado
-            for item in carrito_validado:
-                subtotal = item['producto'].precio * item['cantidad']
-                asociacion = RecetaProducto(
-                    receta_id=nueva_receta.id,
-                    producto_id=item['producto'].id,
-                    cantidad=item['cantidad'],
-                    precio_unitario=item['producto'].precio,
-                    subtotal=subtotal,
-                    observaciones=item['observacion']
-                )
-                db.session.add(asociacion)
-
-            # Trazabilidad
             historial = HistorialEstado(
                 tipo_entidad=HistorialEstado.TIPO_RECETA,
                 entidad_id=nueva_receta.id,
                 estado_anterior_id=None,
                 estado_nuevo_id=estado_pendiente.id,
                 usuario_id=current_user.id,
-                observacion="Apertura automática de ficha técnica clínico-operativa."
+                observacion="Carga de receta digitalizada."
             )
             db.session.add(historial)
             
             db.session.commit()
-            registrar_log_sistema("Ingreso Receta", f"Nueva receta e insumos guardados para paciente {paciente.rut}")
-            flash('Receta oftalmológica e insumos asociados registrados con éxito.', 'success')
+            registrar_log_sistema("Ingreso Receta", f"Receta digitalizada cargada para paciente {paciente.rut}")
+            flash('Documento subido y registrado con éxito.', 'success')
             return redirect(url_for('clinica.ficha_paciente', id=paciente.id))
             
         except Exception as e:
             db.session.rollback()
-            flash(f'Error crítico al guardar la receta: {str(e)}', 'danger')
+            flash(f'Error crítico al guardar: {str(e)}', 'danger')
 
-    # Al cargar por primera vez (GET), datos_previos es None
-    return render_template('clinica/crear_receta.html', paciente=paciente, productos=productos_disponibles, hoy=hoy, datos_previos=None)
+    return render_template('clinica/crear_receta.html', paciente=paciente)
+
+@clinica_bp.route('/receta/<int:id>/documento')
+@login_required
+def ver_documento_receta(id):
+    """Ruta protegida para servir el archivo digitalizado sin exponer la carpeta en la web."""
+    receta = RecetaOftalmica.query.get_or_404(id)
+    upload_folder = os.path.join(current_app.root_path, 'uploads', 'recetas')
+    return send_from_directory(upload_folder, receta.archivo_receta)

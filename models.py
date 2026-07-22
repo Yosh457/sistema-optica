@@ -111,16 +111,27 @@ class Producto(db.Model):
 # MÓDULO CLÍNICO (PACIENTES Y RECETAS)
 # ==============================================================================
 
+class Establecimiento(db.Model):
+    __tablename__ = 'establecimientos'
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(255), unique=True, nullable=False)
+    activo = db.Column(db.Boolean, default=True)
+    
+    pacientes = db.relationship('Paciente', back_populates='establecimiento')
+
 class Paciente(db.Model):
     __tablename__ = 'pacientes'
     id = db.Column(db.Integer, primary_key=True)
     rut = db.Column(db.String(12), unique=True, nullable=False, index=True)
     nombre_completo = db.Column(db.String(255), nullable=False)
-    telefono = db.Column(db.String(20), nullable=True)
-    direccion = db.Column(db.String(255), nullable=True)
+    telefono = db.Column(db.String(20), nullable=False)
+    direccion = db.Column(db.String(255), nullable=False)
     fecha_registro = db.Column(db.DateTime, default=obtener_hora_chile)
     activo = db.Column(db.Boolean, default=True)
 
+    establecimiento_id = db.Column(db.Integer, db.ForeignKey('establecimientos.id', ondelete='RESTRICT'), nullable=True, index=True)
+    establecimiento = db.relationship('Establecimiento', back_populates='pacientes')
+    
     recetas = db.relationship('RecetaOftalmica', back_populates='paciente', cascade="all, delete-orphan")
     ordenes = db.relationship('OrdenTrabajo', back_populates='paciente')
 
@@ -141,23 +152,10 @@ class RecetaProducto(db.Model):
 class RecetaOftalmica(db.Model):
     __tablename__ = 'recetas_oftalmicas'
     id = db.Column(db.Integer, primary_key=True)
-    fecha_receta = db.Column(db.Date, nullable=False)
-    
-    # Ojo Derecho (OD)
-    od_esfera = db.Column(db.String(20), nullable=True)
-    od_cilindro = db.Column(db.String(20), nullable=True)
-    od_eje = db.Column(db.String(20), nullable=True)
-    
-    # Ojo Izquierdo (OI)
-    oi_esfera = db.Column(db.String(20), nullable=True)
-    oi_cilindro = db.Column(db.String(20), nullable=True)
-    oi_eje = db.Column(db.String(20), nullable=True)
+    archivo_receta = db.Column(db.String(255), nullable=False) # Nombre del archivo digitalizado
     
     # Generales
-    distancia_pupilar = db.Column(db.String(20), nullable=True)
-    adicion = db.Column(db.String(20), nullable=True)
     observaciones = db.Column(db.Text, nullable=True)
-    
     activa = db.Column(db.Boolean, default=True, nullable=False) # Indicador de vigencia
     
     # Auditoría Estándar
