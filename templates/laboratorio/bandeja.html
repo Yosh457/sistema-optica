@@ -2,112 +2,221 @@
 {% block title %}Bandeja de Laboratorio{% endblock %}
 
 {% block content %}
-<div class="max-w-[1400px] mx-auto my-8 px-4">
-    <div class="border-b pb-4 mb-8 flex justify-between items-center flex-wrap gap-4">
+<div class="max-w-7xl mx-auto my-8 px-4">
+    <!-- Encabezado -->
+    <div class="border-b pb-4 mb-6 flex justify-between items-center flex-wrap gap-4">
         <div>
             <h2 class="text-3xl font-bold text-gray-800">Taller y Laboratorio Óptico</h2>
-            <p class="text-gray-500 text-sm mt-1">Gestión técnica, armado y biselado de cristales.</p>
+            <p class="text-gray-500 text-sm mt-1">Gestión técnica y revisión de recetas médicas.</p>
         </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-        
-        <div class="bg-gray-100/50 rounded-xl p-4 border border-gray-200">
-            <div class="flex items-center justify-between mb-4 pb-2 border-b-2 border-yellow-400">
-                <h3 class="font-bold text-gray-700 uppercase tracking-wide text-sm">Pendientes / Faltantes</h3>
-                <span class="bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded-full">{{ pendientes|length }}</span>
-            </div>
-            <div class="space-y-4">
-                {% for r in pendientes %}
-                <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 {% if r.estado.nombre == 'Esperando Stock' %}border-orange-500{% else %}border-yellow-400{% endif %} hover:shadow-md transition">
-                    <div class="flex justify-between items-start mb-2 flex-wrap gap-2">
-                        <span class="text-xs font-bold text-gray-500">Receta #{{ r.id }}</span>
-                        <span class="text-[10px] font-semibold px-2 py-0.5 rounded uppercase tracking-wider {% if r.estado.nombre == 'Esperando Stock' %}bg-orange-100 text-orange-800{% else %}bg-yellow-100 text-yellow-800{% endif %}">
+    <!-- Navegación de Pestañas (Tabs) -->
+    <div class="flex border-b border-gray-200 mb-6 overflow-x-auto">
+        <button onclick="openTab(event, 'tab-pendientes')" class="tab-btn px-6 py-3 font-bold text-sm uppercase tracking-wide text-yellow-600 border-b-4 border-yellow-500 bg-yellow-50 whitespace-nowrap transition-colors">
+            Pendientes / Faltantes ({{ pendientes|length }})
+        </button>
+        <button onclick="openTab(event, 'tab-fabricacion')" class="tab-btn px-6 py-3 font-bold text-sm uppercase tracking-wide text-gray-500 border-b-4 border-transparent hover:text-blue-600 hover:bg-blue-50 whitespace-nowrap transition-colors">
+            En Fabricación ({{ fabricacion|length }})
+        </button>
+        <button onclick="openTab(event, 'tab-listas')" class="tab-btn px-6 py-3 font-bold text-sm uppercase tracking-wide text-gray-500 border-b-4 border-transparent hover:text-green-600 hover:bg-green-50 whitespace-nowrap transition-colors">
+            Listas para Entrega ({{ listas|length }})
+        </button>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- PESTAÑA 1: PENDIENTES / FALTANTES          -->
+    <!-- ========================================== -->
+    <div id="tab-pendientes" class="tab-content block">
+        {% if pendientes %}
+        <div class="space-y-4">
+            {% for r in pendientes %}
+            <details class="group border rounded-lg shadow-sm bg-white [&_summary::-webkit-details-marker]:hidden border-l-4 border-l-yellow-400">
+                <!-- Cabecera del Acordeón -->
+                <summary class="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition">
+                    <div class="flex items-center gap-4 flex-wrap">
+                        <span class="font-black text-gray-800">Receta #{{ r.id }}</span>
+                        <span class="font-semibold text-gray-600 border-l pl-4">{{ r.paciente.nombre_completo }}</span>
+                        <span class="text-[10px] font-bold rounded px-2 py-0.5 uppercase tracking-wider
+                            {% if r.estado.nombre == 'Esperando Stock' %} bg-orange-100 text-orange-800 border border-orange-200
+                            {% else %} bg-yellow-100 text-yellow-800 border border-yellow-200 {% endif %}">
                             {{ r.estado.nombre }}
                         </span>
                     </div>
-                    <h4 class="font-bold text-gray-800">{{ r.paciente.nombre_completo }}</h4>
-                    <p class="text-xs text-gray-500 mb-3">Ingreso: {{ r.fecha_registro.strftime('%d-%m-%Y %H:%M') }}</p>
-                    
-                    <ul class="text-xs text-gray-600 mb-4 list-disc pl-4 space-y-1">
-                        {% for prod in r.productos_asociados %}
-                        <li>{{ prod.cantidad }}x {{ prod.producto.nombre }}</li>
-                        {% endfor %}
-                    </ul>
+                    <span class="transition group-open:rotate-180 text-gray-400">
+                        <svg fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="24"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </span>
+                </summary>
+                
+                <!-- Contenido del Acordeón -->
+                <div class="p-6 border-t bg-gray-50/50">
+                    <!-- Metadatos de Contexto -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-sm">
+                        <div class="bg-white p-3 rounded border shadow-sm">
+                            <span class="block text-xs font-bold text-gray-500 uppercase">Paciente</span>
+                            <span class="font-semibold">{{ r.paciente.nombre_completo }} ({{ r.paciente.rut }})</span>
+                        </div>
+                        <div class="bg-white p-3 rounded border shadow-sm">
+                            <span class="block text-xs font-bold text-gray-500 uppercase">Fecha Ingreso</span>
+                            <span>{{ r.fecha_registro.strftime('%d-%m-%Y %H:%M') }}</span>
+                        </div>
+                        <div class="bg-white p-3 rounded border shadow-sm">
+                            <span class="block text-xs font-bold text-gray-500 uppercase">Observaciones Clínicas</span>
+                            <span class="italic text-gray-700">{{ r.observaciones or 'Sin observaciones adicionales.' }}</span>
+                        </div>
+                    </div>
 
-                    <form action="{{ url_for('laboratorio.cambiar_estado', id=r.id) }}" method="POST" class="mt-2 pt-3 border-t">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <div class="flex gap-2">
-                            <select name="nuevo_estado_id" class="text-xs border rounded p-1 w-full bg-gray-50" required>
-                                <option value="" disabled selected>-- Cambiar Estado --</option>
+                    <!-- Visor de Documento Inteligente -->
+                    <div class="mb-6 border rounded-lg overflow-hidden bg-white shadow-inner">
+                        <div class="bg-gray-100 px-4 py-2 border-b text-xs font-bold text-gray-600 uppercase flex justify-between">
+                            <span>Documento Clínico Digitalizado</span>
+                            <a href="{{ url_for('clinica.ver_documento_receta', id=r.id) }}" target="_blank" class="text-indigo-600 hover:underline">Abrir en nueva pestaña ↗</a>
+                        </div>
+                        <div class="w-full flex justify-center bg-gray-200 min-h-[400px]">
+                            {% if r.archivo_receta.lower().endswith('.pdf') %}
+                                <embed src="{{ url_for('clinica.ver_documento_receta', id=r.id) }}" type="application/pdf" class="w-full h-[600px]">
+                            {% else %}
+                                <img src="{{ url_for('clinica.ver_documento_receta', id=r.id) }}" alt="Receta Clínica" class="max-w-full h-auto object-contain max-h-[800px]">
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Panel de Acciones -->
+                    <div class="bg-white p-4 rounded-lg border shadow-sm flex items-center justify-between flex-wrap gap-4">
+                        <span class="text-sm font-bold text-gray-700">Acción Requerida:</span>
+                        <form action="{{ url_for('laboratorio.cambiar_estado', id=r.id) }}" method="POST" class="flex gap-2 w-full md:w-auto">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <select name="nuevo_estado_id" class="px-3 py-2 border rounded-lg bg-gray-50 text-sm focus:ring-2 focus:ring-blue-500 outline-none flex-grow" required>
+                                <option value="" disabled selected>-- Mover a nuevo estado --</option>
                                 {% for e in estados %}
-                                    <option value="{{ e.id }}">Mover a: {{ e.nombre }}</option>
+                                    <option value="{{ e.id }}">{{ e.nombre }}</option>
                                 {% endfor %}
                             </select>
-                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white p-1 rounded text-xs font-bold px-3 transition">→</button>
-                        </div>
-                    </form>
-                </div>
-                {% else %}
-                <p class="text-sm text-gray-400 text-center py-4 italic">No hay recetas pendientes.</p>
-                {% endfor %}
-            </div>
-        </div>
-
-        <div class="bg-gray-100/50 rounded-xl p-4 border border-gray-200">
-            <div class="flex items-center justify-between mb-4 pb-2 border-b-2 border-blue-500">
-                <h3 class="font-bold text-gray-700 uppercase tracking-wide text-sm">En Fabricación (Taller)</h3>
-                <span class="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded-full">{{ fabricacion|length }}</span>
-            </div>
-            <div class="space-y-4">
-                {% for r in fabricacion %}
-                <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-blue-500 hover:shadow-md transition">
-                    <div class="flex justify-between items-start mb-2">
-                        <span class="text-xs font-bold text-gray-500">Receta #{{ r.id }}</span>
+                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg text-sm font-bold transition shadow-md whitespace-nowrap">
+                                Actualizar
+                            </button>
+                        </form>
                     </div>
-                    <h4 class="font-bold text-gray-800">{{ r.paciente.nombre_completo }}</h4>
-                    <p class="text-xs text-blue-600 font-medium mb-3 mt-1">⚙️ Trabajando en los lentes...</p>
-                    
-                    <form action="{{ url_for('laboratorio.cambiar_estado', id=r.id) }}" method="POST" class="mt-2 pt-3 border-t">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <input type="hidden" name="nuevo_estado_id" value="{% for e in estados %}{% if e.nombre == 'Lista' %}{{ e.id }}{% endif %}{% endfor %}">
-                        
-                        <button type="button" data-receta-id="{{ r.id }}" onclick="abrirModalConfirmacion(this)" class="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg text-xs font-bold uppercase tracking-wide flex justify-center items-center gap-2 transition shadow-sm">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                            Marcar como Lista
-                        </button>
-                    </form>
                 </div>
-                {% else %}
-                <p class="text-sm text-gray-400 text-center py-4 italic">El taller está libre.</p>
-                {% endfor %}
-            </div>
+            </details>
+            {% endfor %}
         </div>
-
-        <div class="bg-gray-100/50 rounded-xl p-4 border border-gray-200">
-            <div class="flex items-center justify-between mb-4 pb-2 border-b-2 border-green-500">
-                <h3 class="font-bold text-gray-700 uppercase tracking-wide text-sm">Listas para Entrega</h3>
-                <span class="bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded-full">{{ listas|length }}</span>
-            </div>
-            <div class="space-y-4">
-                {% for r in listas %}
-                <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-green-500 hover:shadow-md transition opacity-80">
-                    <div class="flex justify-between items-start mb-2">
-                        <span class="text-xs font-bold text-gray-500">Receta #{{ r.id }}</span>
-                    </div>
-                    <h4 class="font-bold text-gray-800 line-through">{{ r.paciente.nombre_completo }}</h4>
-                    <p class="text-xs text-green-600 font-bold mb-1 mt-1">✓ Lentes terminados.</p>
-                    <p class="text-[10px] text-gray-400 uppercase">A la espera de facturación en el área comercial.</p>
-                </div>
-                {% else %}
-                <p class="text-sm text-gray-400 text-center py-4 italic">No hay órdenes terminadas.</p>
-                {% endfor %}
-            </div>
+        {% else %}
+        <div class="text-center py-16 bg-white rounded-xl shadow-sm border border-dashed border-gray-300">
+            <svg class="mx-auto h-12 w-12 text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+            <p class="text-gray-500 font-medium">Excelente. No hay recetas pendientes de atención.</p>
         </div>
-
+        {% endif %}
     </div>
+
+    <!-- ========================================== -->
+    <!-- PESTAÑA 2: EN FABRICACIÓN (TALLER)         -->
+    <!-- ========================================== -->
+    <div id="tab-fabricacion" class="tab-content hidden">
+        {% if fabricacion %}
+        <div class="space-y-4">
+            {% for r in fabricacion %}
+            <details class="group border rounded-lg shadow-sm bg-white [&_summary::-webkit-details-marker]:hidden border-l-4 border-l-blue-500">
+                <summary class="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition">
+                    <div class="flex items-center gap-4 flex-wrap">
+                        <span class="font-black text-gray-800">Receta #{{ r.id }}</span>
+                        <span class="font-semibold text-gray-600 border-l pl-4">{{ r.paciente.nombre_completo }}</span>
+                        <span class="text-[10px] font-bold rounded px-2 py-0.5 uppercase tracking-wider bg-blue-100 text-blue-800 border border-blue-200">
+                            ⚙️ En Fabricación
+                        </span>
+                    </div>
+                    <span class="transition group-open:rotate-180 text-gray-400">
+                        <svg fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="24"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </span>
+                </summary>
+                
+                <div class="p-6 border-t bg-gray-50/50">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 text-sm">
+                        <div class="bg-white p-3 rounded border shadow-sm">
+                            <span class="block text-xs font-bold text-gray-500 uppercase">Paciente</span>
+                            <span class="font-semibold">{{ r.paciente.nombre_completo }} ({{ r.paciente.rut }})</span>
+                        </div>
+                        <div class="bg-white p-3 rounded border shadow-sm">
+                            <span class="block text-xs font-bold text-gray-500 uppercase">Observaciones Clínicas</span>
+                            <span class="italic text-gray-700">{{ r.observaciones or 'Sin observaciones adicionales.' }}</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-6 border rounded-lg overflow-hidden bg-white shadow-inner">
+                        <div class="bg-gray-100 px-4 py-2 border-b text-xs font-bold text-gray-600 uppercase flex justify-between">
+                            <span>Documento Clínico Digitalizado</span>
+                            <a href="{{ url_for('clinica.ver_documento_receta', id=r.id) }}" target="_blank" class="text-indigo-600 hover:underline">Abrir ↗</a>
+                        </div>
+                        <div class="w-full flex justify-center bg-gray-200 min-h-[400px]">
+                            {% if r.archivo_receta.lower().endswith('.pdf') %}
+                                <embed src="{{ url_for('clinica.ver_documento_receta', id=r.id) }}" type="application/pdf" class="w-full h-[600px]">
+                            {% else %}
+                                <img src="{{ url_for('clinica.ver_documento_receta', id=r.id) }}" alt="Receta Clínica" class="max-w-full h-auto object-contain max-h-[800px]">
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 p-4 rounded-lg border border-blue-200 shadow-sm flex items-center justify-between flex-wrap gap-4">
+                        <div>
+                            <span class="block text-sm font-bold text-blue-900">¿Lente terminado?</span>
+                            <span class="text-xs text-blue-700">Mueve esta tarjeta a la zona de entregas.</span>
+                        </div>
+                        <form action="{{ url_for('laboratorio.cambiar_estado', id=r.id) }}" method="POST" class="w-full md:w-auto">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <input type="hidden" name="nuevo_estado_id" value="{% for e in estados %}{% if e.nombre == 'Lista' %}{{ e.id }}{% endif %}{% endfor %}">
+                            <button type="button" data-receta-id="{{ r.id }}" onclick="abrirModalConfirmacion(this)" class="w-full bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg text-sm font-bold uppercase tracking-wide transition shadow-md flex items-center justify-center gap-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                Marcar como Lista
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </details>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-16 bg-white rounded-xl shadow-sm border border-dashed border-gray-300">
+            <p class="text-gray-500 font-medium">El taller está libre. No hay trabajos en curso.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ========================================== -->
+    <!-- PESTAÑA 3: LISTAS PARA ENTREGA             -->
+    <!-- ========================================== -->
+    <div id="tab-listas" class="tab-content hidden">
+        {% if listas %}
+        <div class="space-y-4">
+            {% for r in listas %}
+            <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-green-500 flex justify-between items-center opacity-90 hover:opacity-100 transition">
+                <div>
+                    <div class="flex items-center gap-3 mb-1">
+                        <span class="text-xs font-bold text-gray-500">Receta #{{ r.id }}</span>
+                        <span class="px-2 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider bg-green-100 text-green-800 border border-green-200">
+                            ✓ Lentes Terminados
+                        </span>
+                    </div>
+                    <h4 class="font-bold text-gray-800 line-through decoration-2 decoration-green-500">{{ r.paciente.nombre_completo }}</h4>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs text-gray-500 uppercase font-medium">A la espera de</p>
+                    <p class="text-sm font-bold text-indigo-600">Facturación en Caja</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-16 bg-white rounded-xl shadow-sm border border-dashed border-gray-300">
+            <p class="text-gray-500 font-medium">No hay órdenes terminadas esperando entrega.</p>
+        </div>
+        {% endif %}
+    </div>
+
 </div>
 
+<!-- ========================================== -->
+<!-- MODAL DE CONFIRMACIÓN DEL LABORATORIO      -->
+<!-- ========================================== -->
 <div id="modal-confirmacion" class="fixed inset-0 z-50 items-center justify-center hidden bg-black bg-opacity-60 backdrop-blur-sm flex">
     <div class="absolute inset-0" onclick="cerrarModalConfirmacion()"></div>
     
@@ -124,7 +233,6 @@
             <p class="text-gray-600 text-sm leading-relaxed">
                 ¿Confirmas que los lentes de la receta <span id="modal-receta-id" class="font-bold text-gray-800 text-base bg-gray-100 px-2 py-0.5 rounded"></span> están <span class="font-bold">100% terminados</span> y listos para ser entregados al paciente?
             </p>
-            <p class="text-xs text-green-600 font-bold mt-3">Esta acción trasladará la tarjeta al área comercial (Caja).</p>
         </div>
 
         <div class="flex gap-3 border-t border-gray-200 pt-4">
@@ -136,8 +244,42 @@
     </div>
 </div>
 
+<!-- ========================================== -->
+<!-- SCRIPTS: LÓGICA DE TABS Y MODALES          -->
+<!-- ========================================== -->
 <script>
-// --- LÓGICA DEL MODAL DE CONFIRMACIÓN ---
+// Lógica de Pestañas (Tabs)
+function openTab(evt, tabName) {
+    // 1. Ocultar todos los contenidos de pestañas
+    var tabcontent = document.getElementsByClassName("tab-content");
+    for (var i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+    }
+
+    // 2. Definir la clase base (inactiva) para todos los botones
+    var baseClass = "tab-btn px-6 py-3 font-bold text-sm uppercase tracking-wide whitespace-nowrap transition-colors text-gray-500 border-b-4 border-transparent hover:text-blue-600 hover:bg-blue-50";
+
+    // 3. Resetear todos los botones al estado base
+    var tablinks = document.getElementsByClassName("tab-btn");
+    for (var i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = baseClass;
+    }
+
+    // 4. Mostrar el contenido de la pestaña actual
+    document.getElementById(tabName).style.display = "block";
+    
+    // 5. Aplicar los estilos activos al botón clickeado según la pestaña
+    var btn = evt.currentTarget;
+    if(tabName === 'tab-pendientes'){
+        btn.className = "tab-btn px-6 py-3 font-bold text-sm uppercase tracking-wide whitespace-nowrap transition-colors border-b-4 text-yellow-600 border-yellow-500 bg-yellow-50";
+    } else if(tabName === 'tab-fabricacion'){
+        btn.className = "tab-btn px-6 py-3 font-bold text-sm uppercase tracking-wide whitespace-nowrap transition-colors border-b-4 text-blue-600 border-blue-500 bg-blue-50";
+    } else if(tabName === 'tab-listas'){
+        btn.className = "tab-btn px-6 py-3 font-bold text-sm uppercase tracking-wide whitespace-nowrap transition-colors border-b-4 text-green-600 border-green-500 bg-green-50";
+    }
+}
+
+// Lógica del Modal
 let formAEnviar = null;
 
 function abrirModalConfirmacion(btn) {
@@ -170,10 +312,7 @@ function cerrarModalConfirmacion() {
 
 // Evento de confirmación en el modal
 document.getElementById('btn-confirmar-lista').addEventListener('click', function() {
-    if (formAEnviar) {
-        // Al enviar, el script global de base.html se encargará de la prevención de doble envío.
-        formAEnviar.submit();
-    }
+    if (formAEnviar) { formAEnviar.submit(); }
 });
 
 // Cerrar con tecla Escape

@@ -1,8 +1,9 @@
 # app.py
 import os
 from dotenv import load_dotenv
-from flask import Flask, redirect, url_for, flash, render_template
+from flask import Flask, redirect, url_for, flash, render_template, request
 from flask_wtf.csrf import CSRFError
+from werkzeug.exceptions import RequestEntityTooLarge
 
 # Importamos extensiones y modelos
 from extensions import login_manager, csrf
@@ -33,7 +34,7 @@ def create_app():
     
     app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024 # Límite de 32MB
+    app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024 # Límite de 5MB
     
     # Configuración de Pool para estabilidad
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
@@ -85,6 +86,12 @@ def create_app():
     def handle_csrf_error(e):
         flash('La sesión expiró. Ingrese nuevamente.', 'warning')
         return redirect(url_for('auth.login'))
+    
+    @app.errorhandler(RequestEntityTooLarge)
+    def handle_file_too_large(e):
+        """Maneja el error 413 cuando un archivo supera el límite de tamaño configurado."""
+        flash("El archivo supera el tamaño máximo permitido (5 MB).", "danger")
+        return redirect(request.referrer or url_for("clinica.listar_pacientes"))
     
     @app.after_request
     def add_header(response):

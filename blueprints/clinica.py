@@ -4,7 +4,6 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 from datetime import datetime
-from werkzeug.utils import secure_filename
 
 from models import db, Paciente, RecetaOftalmica, Establecimiento, HistorialEstado, EstadoReceta
 from utils import registrar_log_sistema
@@ -36,7 +35,7 @@ def listar_pacientes():
         query = query.filter(
             or_(Paciente.rut.ilike(f'%{busqueda}%'),
                 Paciente.nombre_completo.ilike(f'%{busqueda}%'),
-                Paciente.telefono.ilike(f'%{busqueda}%')) # Búsqueda por teléfono añadida
+                Paciente.telefono.ilike(f'%{busqueda}%'))
         )
     
     pagination = query.order_by(Paciente.nombre_completo).paginate(page=page, per_page=10, error_out=False)
@@ -141,14 +140,48 @@ def toggle_paciente(id):
 @login_required
 def ficha_paciente(id):
     paciente = Paciente.query.get_or_404(id)
-    # Mostramos historial ordenado por fecha de registro (ya no existe fecha_receta)
+    
+    # Recetas ordenadas
     recetas = RecetaOftalmica.query.filter_by(paciente_id=id).order_by(RecetaOftalmica.fecha_registro.desc()).all()
-    return render_template('clinica/ficha_paciente.html', paciente=paciente, recetas=recetas)
+    
+    # Pre-cálculo de estadísticas para la UI
+    stats = {
+        'total': len(recetas),
+        'vigentes': sum(1 for r in recetas if r.activa),
+        'cerradas': sum(1 for r in recetas if not r.activa),
+        'ultima_fecha': recetas[0].fecha_registro.strftime('%d-%m-%Y') if recetas else 'N/A'
+    }
+
+    # Cargar la línea de tiempo de estados para cada receta
+    historial_por_receta = {}
+    for receta in recetas:
+        historial = HistorialEstado.query.filter_by(
+            tipo_entidad=HistorialEstado.TIPO_RECETA,
+            entidad_id=receta.id
+        ).order_by(HistorialEstado.fecha.desc()).all()
+        historial_por_receta[receta.id] = historial
+        
+    # Diccionario estático para garantizar meses en español siempre
+    meses_espanol = {
+        1: 'enero', 2: 'febrero', 3: 'marzo', 4: 'abril',
+        5: 'mayo', 6: 'junio', 7: 'julio', 8: 'agosto',
+        9: 'septiembre', 10: 'octubre', 11: 'noviembre', 12: 'diciembre'
+    }
+
+    return render_template('clinica/ficha_paciente.html', 
+                           paciente=paciente, 
+                           recetas=recetas, 
+                           stats=stats,
+                           historial_por_receta=historial_por_receta,
+                           meses=meses_espanol)
 
 @clinica_bp.route('/pacientes/<int:id>/receta/crear', methods=['GET', 'POST'])
 @login_required
 def crear_receta(id):
     paciente = Paciente.query.get_or_404(id)
+    
+    # Contar recetas existentes para mostrarlas en la UI
+    total_recetas_previas = RecetaOftalmica.query.filter_by(paciente_id=paciente.id).count()
 
     if request.method == 'POST':
         # 1. Validación del archivo
@@ -177,9 +210,11 @@ def crear_receta(id):
             upload_folder = os.path.join(current_app.root_path, 'uploads', 'recetas')
             os.makedirs(upload_folder, exist_ok=True)
             
-            # Nombre seguro con RUT y timestamp para evitar sobreescritura
+            # Nombre de archivo limpio con RUT y timestamp para evitar sobreescritura
             timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-            safe_filename = secure_filename(f"{paciente.rut}_{timestamp}_{file.filename}")
+            extension = os.path.splitext(file.filename)[1].lower()
+            safe_filename = f"{paciente.rut}_{timestamp}{extension}"
+            
             file_path = os.path.join(upload_folder, safe_filename)
             file.save(file_path)
 
@@ -201,7 +236,7 @@ def crear_receta(id):
                 estado_anterior_id=None,
                 estado_nuevo_id=estado_pendiente.id,
                 usuario_id=current_user.id,
-                observacion="Carga de receta digitalizada."
+                observacion="Carga inicial de receta digitalizada."
             )
             db.session.add(historial)
             
@@ -214,7 +249,7 @@ def crear_receta(id):
             db.session.rollback()
             flash(f'Error crítico al guardar: {str(e)}', 'danger')
 
-    return render_template('clinica/crear_receta.html', paciente=paciente)
+    return render_template('clinica/crear_receta.html', paciente=paciente, total_recetas_previas=total_recetas_previas)
 
 @clinica_bp.route('/receta/<int:id>/documento')
 @login_required

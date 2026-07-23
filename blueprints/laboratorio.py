@@ -20,14 +20,13 @@ ESTADO_RECETA_ANULADA = "Anulada"
 def bandeja_trabajo():
     """
     Vista tipo Kanban del laboratorio.
-    Muestra las recetas agrupadas por sus estados operativos.
-    Solo carga recetas VIGENTES (activa=True) buscando dinámicamente los estados por su nombre.
+    Adaptación temporal: Solo lee la tabla de recetas y ordena por fecha_registro.
     """
     # 1. Pendientes y Esperando Stock
     recetas_pendientes = RecetaOftalmica.query.join(EstadoReceta).filter(
         EstadoReceta.nombre.in_([ESTADO_RECETA_PENDIENTE, ESTADO_RECETA_ESPERANDO]),
         RecetaOftalmica.activa.is_(True)
-    ).order_by(RecetaOftalmica.fecha_receta.asc()).all()
+    ).order_by(RecetaOftalmica.fecha_registro.asc()).all()
     
     # 2. En Fabricación
     recetas_fabricacion = RecetaOftalmica.query.join(EstadoReceta).filter(
@@ -40,8 +39,8 @@ def bandeja_trabajo():
         EstadoReceta.nombre == ESTADO_RECETA_LISTA,
         RecetaOftalmica.activa.is_(True)
     ).order_by(RecetaOftalmica.fecha_modificacion.desc()).all()
-
-    # Traemos los estados para los selects de cambio de estado rápido
+    
+    # 4. Estados disponibles para el dropdown de cambio de estado
     estados_disponibles = EstadoReceta.query.order_by(EstadoReceta.orden).all()
 
     return render_template('laboratorio/bandeja.html', 
