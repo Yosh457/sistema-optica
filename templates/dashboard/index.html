@@ -8,7 +8,8 @@
         <p class="text-gray-500 mt-2">Selecciona el módulo al que deseas ingresar.</p>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <!-- Ajustamos el grid para acomodar 5 elementos de forma elegante -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
         
         <a href="{{ url_for('clinica.listar_pacientes') }}" class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6 border-t-4 border-blue-500 flex flex-col items-center text-center group">
             <div class="bg-blue-50 text-blue-600 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform">
@@ -16,6 +17,15 @@
             </div>
             <h2 class="text-lg font-bold text-gray-800 mb-1">Clínica (Recetas)</h2>
             <p class="text-gray-500 text-xs">Fichas, historial y medidas oftalmológicas.</p>
+        </a>
+
+        <!-- NUEVO MÓDULO: COTIZACIONES -->
+        <a href="{{ url_for('cotizaciones.listado') }}" class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6 border-t-4 border-cyan-500 flex flex-col items-center text-center group">
+            <div class="bg-cyan-50 text-cyan-600 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+            </div>
+            <h2 class="text-lg font-bold text-gray-800 mb-1">Cotizaciones</h2>
+            <p class="text-gray-500 text-xs">Presupuestos, historial y descarga de PDF.</p>
         </a>
 
         <a href="{{ url_for('laboratorio.bandeja_trabajo') }}" class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6 border-t-4 border-amber-500 flex flex-col items-center text-center group">

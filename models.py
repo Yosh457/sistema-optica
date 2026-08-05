@@ -44,6 +44,14 @@ class Usuario(db.Model, UserMixin):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
+class ConfiguracionSistema(db.Model):
+    """Almacena parámetros globales como Días de Vigencia de Cotizaciones, IVA, etc."""
+    __tablename__ = 'configuracion_sistema'
+    id = db.Column(db.Integer, primary_key=True)
+    clave = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    valor = db.Column(db.String(255), nullable=False)
+    descripcion = db.Column(db.String(255), nullable=True)
+
 # ==============================================================================
 # AUDITORÍA Y LOGS
 # ==============================================================================
@@ -97,7 +105,7 @@ class CategoriaProducto(db.Model):
 class Producto(db.Model):
     __tablename__ = 'productos'
     id = db.Column(db.Integer, primary_key=True)
-    codigo = db.Column(db.String(50), nullable=True, index=True) # Ahora es opcional
+    codigo = db.Column(db.String(50), nullable=True, index=True)
     nombre = db.Column(db.String(255), nullable=False)
     precio = db.Column(db.Numeric(10, 2), nullable=False)
     stock = db.Column(db.Integer, default=0, nullable=False)
@@ -134,6 +142,9 @@ class Paciente(db.Model):
     
     recetas = db.relationship('RecetaOftalmica', back_populates='paciente', cascade="all, delete-orphan")
     ordenes = db.relationship('OrdenTrabajo', back_populates='paciente')
+    
+    # NUEVA RELACIÓN: Historial de cotizaciones del paciente
+    cotizaciones = db.relationship('Cotizacion', back_populates='paciente', cascade="all, delete-orphan")
 
 class RecetaProducto(db.Model):
     __tablename__ = 'receta_productos'
@@ -152,11 +163,11 @@ class RecetaProducto(db.Model):
 class RecetaOftalmica(db.Model):
     __tablename__ = 'recetas_oftalmicas'
     id = db.Column(db.Integer, primary_key=True)
-    archivo_receta = db.Column(db.String(255), nullable=False) # Nombre del archivo digitalizado
+    archivo_receta = db.Column(db.String(255), nullable=False)
     
     # Generales
     observaciones = db.Column(db.Text, nullable=True)
-    activa = db.Column(db.Boolean, default=True, nullable=False) # Indicador de vigencia
+    activa = db.Column(db.Boolean, default=True, nullable=False)
     
     # Auditoría Estándar
     fecha_registro = db.Column(db.DateTime, default=obtener_hora_chile)
@@ -215,7 +226,72 @@ class DetalleOrden(db.Model):
 
     orden = db.relationship('OrdenTrabajo', back_populates='detalles')
     producto = db.relationship('Producto')
+
+# ==============================================================================
+# MÓDULO DE COTIZACIONES
+# ==============================================================================
+
+class EstadoCotizacion(db.Model):
+    """Representa los estados posibles de una cotización"""
+    __tablename__ = 'estados_cotizacion'
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(50), unique=True, nullable=False)
+
+class Cotizacion(db.Model):
+    __tablename__ = 'cotizaciones'
+    id = db.Column(db.Integer, primary_key=True)
     
+    fecha_emision = db.Column(db.DateTime, default=obtener_hora_chile)
+    fecha_vencimiento = db.Column(db.DateTime, nullable=False)
+    
+    # Paciente estricto (eliminamos anónimo por reglas de negocio)
+    paciente_id = db.Column(db.Integer, db.ForeignKey('pacientes.id', ondelete='CASCADE'), nullable=False, index=True)
+    
+    observaciones = db.Column(db.Text, nullable=True)
+    total = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
+    version_documento = db.Column(db.Integer, nullable=False, default=1)
+    
+    estado_id = db.Column(db.Integer, db.ForeignKey('estados_cotizacion.id', ondelete='RESTRICT'), nullable=False)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id', ondelete='RESTRICT'), nullable=False)
+    
+    paciente = db.relationship('Paciente', back_populates='cotizaciones')
+    estado = db.relationship('EstadoCotizacion')
+    usuario = db.relationship('Usuario')
+    detalles = db.relationship('DetalleCotizacion', back_populates='cotizacion', cascade='all, delete-orphan')
+
+    @property
+    def numero_formateado(self):
+        """Genera el número correlativo al vuelo. Ej: COT-2026-0001"""
+        return f"COT-{self.fecha_emision.year}-{self.id:04d}"
+
+    @property
+    def esta_vencida(self):
+        """Calcula al vuelo si la cotización expiró."""
+        if self.estado.nombre != 'Vigente':
+            return False
+        fecha_actual = obtener_hora_chile().date()
+        return fecha_actual > self.fecha_vencimiento.date()
+
+    @property
+    def estado_logico(self):
+        """Devuelve 'Vencida' si expiró, o el estado real (Vigente, Anulada, Convertida en Venta)."""
+        if self.esta_vencida:
+            return 'Vencida'
+        return self.estado.nombre
+
+class DetalleCotizacion(db.Model):
+    __tablename__ = 'detalles_cotizacion'
+    id = db.Column(db.Integer, primary_key=True)
+    cantidad = db.Column(db.Integer, nullable=False, default=1)
+    precio_unitario = db.Column(db.Numeric(10, 2), nullable=False)
+    subtotal = db.Column(db.Numeric(10, 2), nullable=False)
+
+    cotizacion_id = db.Column(db.Integer, db.ForeignKey('cotizaciones.id', ondelete='CASCADE'), nullable=False, index=True)
+    producto_id = db.Column(db.Integer, db.ForeignKey('productos.id', ondelete='RESTRICT'), nullable=False)
+
+    cotizacion = db.relationship('Cotizacion', back_populates='detalles')
+    producto = db.relationship('Producto')
+
 # ==============================================================================
 # HISTORIAL Y TRAZABILIDAD (MÉTRICAS)
 # ==============================================================================

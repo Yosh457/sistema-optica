@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+{% block title %}Nueva Cotización{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto my-8 px-4 space-y-6">
+    
+    <!-- Encabezado -->
+    <div class="border-b pb-4">
+        <h2 class="text-3xl font-bold text-gray-800">Nueva Cotización</h2>
+        <p class="text-gray-500 mt-1">Busque al paciente y agregue los productos al detalle.</p>
+    </div>
+
+    <form method="POST" id="form-cotizacion" class="space-y-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <input type="hidden" name="paciente_id" id="paciente_id" required>
+
+        <!-- 1. SECCIÓN BÚSQUEDA DE PACIENTE -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+            <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z"></path></svg>
+                Asignación de Paciente
+            </h3>
+            
+            <div class="flex gap-4 items-end mb-4">
+                <div class="flex-grow max-w-sm">
+                    <label class="block text-xs font-bold text-gray-600 uppercase mb-1">RUT del Paciente</label>
+                    <input type="text" id="buscar_rut" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ej: 11111111-1" autocomplete="off">
+                </div>
+            </div>
+
+            <!-- Tarjeta de Resultados -->
+            <div id="resultado-paciente" class="hidden bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex flex-col md:flex-row justify-between items-center gap-4 transition-all">
+                <div class="flex items-center gap-4">
+                    <div class="bg-white text-indigo-600 p-3 rounded-full shadow-sm">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-indigo-400 uppercase">Paciente Asignado Correctamente</p>
+                        <h4 id="res-nombre" class="text-lg font-bold text-indigo-900">-</h4>
+                        <p id="res-datos" class="text-sm text-indigo-700 font-medium"></p>
+                    </div>
+                </div>
+            </div>
+            <!-- Mensaje de Error -->
+            <p id="error-paciente" class="hidden text-sm text-red-600 font-bold mt-2"></p>
+        </div>
+
+        <!-- 2. SECCIÓN PRODUCTOS Y CARRITO -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+            <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
+                Detalle de la Cotización
+            </h3>
+
+            <!-- Buscador de Productos -->
+            <div class="flex flex-wrap gap-4 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100 items-end">
+                <div class="flex-grow">
+                    <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Seleccionar Producto</label>
+                    <select id="select_producto" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                        <option value="" disabled selected>-- Elija un producto --</option>
+                        {% for p in productos %}
+                        <option value="{{ p.id }}" data-precio="{{ p.precio }}" data-nombre="{{ p.nombre }}">
+                            {{ p.nombre }} - ${{ '{:,.0f}'.format(p.precio).replace(',', '.') }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="button" onclick="agregarAlCarrito()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold transition shadow-sm flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg> Agregar
+                </button>
+            </div>
+
+            <!-- Tabla del Carrito -->
+            <div class="overflow-x-auto border border-gray-200 rounded-xl mb-6">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-gray-100 text-gray-600 text-xs uppercase font-bold tracking-wider">
+                        <tr>
+                            <th class="p-4">Producto</th>
+                            <th class="p-4 w-32">Precio Unit.</th>
+                            <th class="p-4 w-24 text-center">Cant.</th>
+                            <th class="p-4 w-32 text-right">Subtotal</th>
+                            <th class="p-4 w-16 text-center">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-carrito" class="divide-y divide-gray-200 bg-white text-sm">
+                    </tbody>
+                </table>
+                <div id="carrito-vacio" class="p-8 text-center text-gray-400 italic text-sm">
+                    No hay productos agregados a la cotización.
+                </div>
+            </div>
+
+            <!-- Panel de Totales -->
+            <div class="flex justify-end">
+                <div class="bg-gray-50 border border-gray-200 p-4 rounded-xl w-full sm:w-64 text-right">
+                    <p class="text-xs font-bold text-gray-500 uppercase mb-1">Total Cotización</p>
+                    <p class="text-3xl font-black text-blue-700">$<span id="total-general">0</span></p>
+                    <input type="hidden" name="total" id="input_total" value="0">
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. OBSERVACIONES Y BOTONERA -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-6">
+            <div>
+                <label class="block text-sm font-bold text-gray-800 mb-2">Notas Adicionales (Opcional)</label>
+                <!-- Se cambió el placeholder para no incluir la info que irá fija en el PDF -->
+                <textarea name="observaciones" rows="2" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition" placeholder="Ej: El paciente requiere armazón especial."></textarea>
+            </div>
+
+            <div class="flex justify-end gap-4 pt-4 border-t border-gray-100">
+                <a href="{{ url_for('cotizaciones.listado') }}" class="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-bold transition">Cancelar</a>
+                
+                <!-- Único Botón de Acción -->
+                <button type="submit" class="px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold transition shadow-sm flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    Generar e Imprimir Cotización
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+// ==========================================
+// LÓGICA DE BÚSQUEDA DE PACIENTE (AJAX REAL)
+// ==========================================
+const rutInput = document.getElementById('buscar_rut');
+let debounceTimer;
+
+// Buscar automáticamente mientras se escribe (después de 500ms de no teclear)
+rutInput.addEventListener('input', function() {
+    clearTimeout(debounceTimer);
+    if(this.value.trim().length >= 8) {
+        debounceTimer = setTimeout(() => {
+            buscarPacienteAPI();
+        }, 500);
+    }
+});
+
+// Buscar también al salir del campo
+rutInput.addEventListener('blur', function() {
+    if(this.value.trim().length >= 8) {
+        buscarPacienteAPI();
+    }
+});
+
+async function buscarPacienteAPI() {
+    const rutVal = rutInput.value.trim();
+    const resultCard = document.getElementById('resultado-paciente');
+    const errorMsg = document.getElementById('error-paciente');
+    const inputOcultoId = document.getElementById('paciente_id');
+
+    if (!rutVal) return;
+
+    try {
+        const response = await fetch(`/api/pacientes/buscar?rut=${rutVal}`);
+        const data = await response.json();
+
+        if (data.success) {
+            // Mostrar TODO: Nombre, RUT, Teléfono y Dirección
+            document.getElementById('res-nombre').textContent = data.paciente.nombre_completo;
+            document.getElementById('res-datos').textContent = `RUT: ${data.paciente.rut} • Tel: ${data.paciente.telefono} • Dir: ${data.paciente.direccion}`;
+            
+            inputOcultoId.value = data.paciente.id;
+
+            resultCard.classList.remove('hidden');
+            resultCard.classList.add('flex');
+            errorMsg.classList.add('hidden');
+        } else {
+            resultCard.classList.add('hidden');
+            resultCard.classList.remove('flex');
+            inputOcultoId.value = '';
+            errorMsg.textContent = data.mensaje || "Paciente no encontrado.";
+            errorMsg.classList.remove('hidden');
+        }
+    } catch (error) {
+        console.error("Error en la petición:", error);
+    }
+}
+
+// Prevenir que un Enter envíe el formulario completo
+rutInput.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); }
+});
+
+// ==========================================
+// LÓGICA DEL CARRITO DINÁMICO
+// ==========================================
+let indexFila = 0; 
+
+function agregarAlCarrito() {
+    const select = document.getElementById('select_producto');
+    if (!select.value) return; 
+
+    const opcion = select.options[select.selectedIndex];
+    const productoId = select.value;
+    const nombre = opcion.dataset.nombre;
+    const precio = parseFloat(opcion.dataset.precio);
+
+    const tbody = document.getElementById('tabla-carrito');
+    document.getElementById('carrito-vacio').style.display = 'none';
+
+    const tr = document.createElement('tr');
+    tr.className = "hover:bg-gray-50 transition";
+    tr.innerHTML = `
+        <td class="p-4 font-medium text-gray-800">
+            ${nombre}
+            <input type="hidden" name="productos[${indexFila}][id]" value="${productoId}">
+            <input type="hidden" name="productos[${indexFila}][precio]" value="${precio}">
+        </td>
+        <td class="p-4">$${precio.toLocaleString('es-CL')}</td>
+        <td class="p-4 text-center">
+            <input type="number" name="productos[${indexFila}][cantidad]" value="1" min="1" class="w-16 px-2 py-1 border rounded text-center input-cantidad" onchange="recalcularFila(this, ${precio})">
+        </td>
+        <td class="p-4 text-right font-bold text-gray-800 subtotal-texto">$${precio.toLocaleString('es-CL')}</td>
+        <td class="p-4 text-center">
+            <button type="button" onclick="eliminarFila(this)" class="text-red-500 hover:text-red-700 bg-red-50 p-2 rounded-lg transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            </button>
+        </td>
+    `;
+    
+    tbody.appendChild(tr);
+    indexFila++;
+    select.selectedIndex = 0;
+    actualizarTotales();
+}
+
+function recalcularFila(inputElement, precio) {
+    const cantidad = parseInt(inputElement.value) || 1;
+    const subtotal = cantidad * precio;
+    const fila = inputElement.closest('tr');
+    const tdSubtotal = fila.querySelector('.subtotal-texto');
+    tdSubtotal.textContent = '$' + subtotal.toLocaleString('es-CL');
+    tdSubtotal.dataset.valor = subtotal;
+    actualizarTotales();
+}
+
+function eliminarFila(btnElement) {
+    const fila = btnElement.closest('tr');
+    fila.remove();
+    const tbody = document.getElementById('tabla-carrito');
+    if (tbody.children.length === 0) {
+        document.getElementById('carrito-vacio').style.display = 'block';
+    }
+    actualizarTotales();
+}
+
+function actualizarTotales() {
+    let suma = 0;
+    const subtotales = document.querySelectorAll('.subtotal-texto');
+    subtotales.forEach(td => {
+        let valor = parseFloat(td.dataset.valor);
+        if (isNaN(valor)) {
+            valor = parseFloat(td.textContent.replace('$', '').replace(/\./g, ''));
+            td.dataset.valor = valor; 
+        }
+        suma += valor;
+    });
+    document.getElementById('total-general').textContent = suma.toLocaleString('es-CL');
+    document.getElementById('input_total').value = suma;
+}
+
+// Validación final antes de enviar
+document.getElementById('form-cotizacion').addEventListener('submit', function(e) {
+    const pacienteId = document.getElementById('paciente_id').value;
+    const tbody = document.getElementById('tabla-carrito');
+
+    if (!pacienteId) {
+        e.preventDefault();
+        alert("Por favor, busque y asigne un paciente válido antes de guardar.");
+        return;
+    }
+    if (tbody.children.length === 0) {
+        e.preventDefault();
+        alert("La cotización debe tener al menos un producto.");
+        return;
+    }
+});
+</script>
+{% endblock %}

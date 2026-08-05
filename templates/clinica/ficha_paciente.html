@@ -199,5 +199,106 @@
         </div>
         {% endif %}
     </div>
+    <!-- ======================================================= -->
+    <!-- 4. SECCIÓN HISTORIAL DE COTIZACIONES (NUEVO)            -->
+    <!-- ======================================================= -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mt-8">
+        <div class="flex justify-between items-center mb-6 border-b pb-4">
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">Expediente de Cotizaciones</h2>
+                <p class="text-xs text-gray-500 mt-1">Historial de presupuestos generados para el paciente.</p>
+            </div>
+            <a href="{{ url_for('cotizaciones.crear') }}" class="btn btn-primary text-sm bg-cyan-600 border-cyan-600 hover:bg-cyan-700 flex items-center gap-2 shadow-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg> Nueva Cotización
+            </a>
+        </div>
+
+        {% if paciente.cotizaciones %}
+        <div class="space-y-4">
+            <!-- Iteramos sobre la relación inversa que creamos en models.py -->
+            {% for coti in paciente.cotizaciones|sort(attribute='fecha_emision', reverse=true) %}
+            <details class="group border border-gray-200 rounded-xl bg-white [&_summary::-webkit-details-marker]:hidden overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                
+                <!-- CABECERA DEL ACORDEÓN -->
+                <summary class="flex items-center justify-between p-5 cursor-pointer bg-gray-50/50 hover:bg-gray-100/80 transition-colors">
+                    <div class="flex items-center gap-4 flex-wrap">
+                        <div class="bg-white p-2 rounded shadow-sm border border-gray-100">
+                            <span class="text-xs font-bold text-gray-400 uppercase block leading-none mb-1">Cotización</span>
+                            <span class="font-black text-cyan-700 leading-none">{{ coti.numero_formateado }}</span>
+                        </div>
+                        
+                        <div>
+                            <p class="text-sm font-bold text-gray-800">{{ coti.fecha_emision.strftime('%d') }} de {{ meses[coti.fecha_emision.month][:3] }}, {{ coti.fecha_emision.strftime('%Y') }}</p>
+                            
+                            <div class="flex gap-2 mt-1 items-center">
+                                <span class="text-sm font-black text-gray-800 border-r pr-3 mr-1">
+                                    ${{ '{:,.0f}'.format(coti.total).replace(',', '.') }}
+                                </span>
+                                
+                                <span class="px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider
+                                    {% if coti.estado_logico == 'Vigente' %} bg-cyan-100 text-cyan-800 border border-cyan-200
+                                    {% elif coti.estado_logico == 'Vencida' %} bg-gray-100 text-gray-600 border border-gray-300
+                                    {% elif coti.estado.nombre == 'Convertida en Venta' %} bg-emerald-100 text-emerald-800 border border-emerald-200
+                                    {% elif coti.estado.nombre == 'Anulada' %} bg-red-100 text-red-800 border border-red-200
+                                    {% else %} bg-gray-100 text-gray-800 {% endif %}">
+                                    {{ coti.estado_logico }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center gap-4">
+                        <span class="text-xs font-bold text-cyan-600 uppercase hidden md:group-open:block">Cerrar Detalles</span>
+                        <span class="transition-transform duration-300 group-open:-rotate-180 text-gray-400 bg-white rounded-full p-1 border shadow-sm">
+                            <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="20"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        </span>
+                    </div>
+                </summary>
+                
+                <!-- CONTENIDO DEL ACORDEÓN -->
+                <div class="p-6 border-t border-gray-200 bg-white">
+                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Productos Cotizados</h4>
+                    
+                    <ul class="divide-y divide-gray-100 mb-6">
+                        {% for det in coti.detalles %}
+                        <li class="py-2 flex justify-between items-center text-sm">
+                            <div>
+                                <span class="font-bold text-gray-800">{{ det.cantidad }}x</span>
+                                <span class="text-gray-600 ml-2">{{ det.producto.nombre }}</span>
+                            </div>
+                            <span class="font-bold text-gray-600">${{ '{:,.0f}'.format(det.subtotal).replace(',', '.') }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+
+                    {% if coti.observaciones %}
+                    <div class="bg-gray-50 p-4 rounded-lg mb-6 border border-gray-100">
+                        <p class="text-xs font-bold text-gray-500 uppercase mb-1">Observaciones</p>
+                        <p class="text-sm text-gray-700 italic">{{ coti.observaciones }}</p>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Botonera de la cotización -->
+                    <div class="flex gap-3">
+                        <a href="{{ url_for('cotizaciones.generar_pdf', id=coti.id) }}" target="_blank" class="flex items-center gap-2 px-4 py-2 bg-white text-cyan-700 font-bold rounded-lg hover:bg-cyan-50 transition border border-cyan-200 shadow-sm text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                            Ver PDF
+                        </a>
+                        
+                        <a href="{{ url_for('cotizaciones.generar_pdf', id=coti.id) }}" download="Cotizacion_{{ coti.numero_formateado }}.pdf" class="flex items-center gap-2 px-4 py-2 bg-cyan-600 text-white font-bold rounded-lg hover:bg-cyan-700 transition shadow-sm text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            Imprimir / Descargar
+                        </a>
+                    </div>
+                </div>
+            </details>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-12 bg-gray-50/50 rounded-xl border border-dashed border-gray-300">
+            <p class="text-gray-500 text-sm mt-1">Este paciente aún no tiene cotizaciones asociadas.</p>
+        </div>
+        {% endif %}
+    </div>
 </div>
 {% endblock %}
