@@ -91,7 +91,7 @@ class MetodoPago(db.Model):
     activo = db.Column(db.Boolean, default=True)
 
 # ==============================================================================
-# MÓDULO DE INVENTARIO
+# MÓDULO DE INVENTARIO Y KARDEX (REFACTORIZADO)
 # ==============================================================================
 
 class CategoriaProducto(db.Model):
@@ -101,19 +101,70 @@ class CategoriaProducto(db.Model):
     activo = db.Column(db.Boolean, default=True)
     
     productos = db.relationship('Producto', back_populates='categoria')
+    
+class Proveedor(db.Model):
+    __tablename__ = 'proveedores'
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(255), nullable=False)
+    activo = db.Column(db.Boolean, default=True)
+    
+    productos = db.relationship('Producto', back_populates='proveedor')
 
 class Producto(db.Model):
     __tablename__ = 'productos'
     id = db.Column(db.Integer, primary_key=True)
     codigo = db.Column(db.String(50), nullable=True, index=True)
     nombre = db.Column(db.String(255), nullable=False)
-    precio = db.Column(db.Numeric(10, 2), nullable=False)
+    precio_compra = db.Column(db.Numeric(10, 2), nullable=False, default=0.00) # Precio Compra (Neto)
+    precio = db.Column(db.Numeric(10, 2), nullable=False) # Precio Venta (IVA Aplicado)
     stock = db.Column(db.Integer, default=0, nullable=False)
     stock_minimo = db.Column(db.Integer, default=5, nullable=False)
     activo = db.Column(db.Boolean, default=True)
 
     categoria_id = db.Column(db.Integer, db.ForeignKey('categorias_productos.id', ondelete='RESTRICT'), nullable=False, index=True)
+    proveedor_id = db.Column(db.Integer, db.ForeignKey('proveedores.id', ondelete='SET NULL'), nullable=True)
+    
     categoria = db.relationship('CategoriaProducto', back_populates='productos')
+    proveedor = db.relationship('Proveedor', back_populates='productos')
+    
+class TipoMovimientoInventario(db.Model):
+    __tablename__ = 'tipos_movimiento_inventario'
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(50), unique=True, nullable=False)
+    operacion = db.Column(db.Integer, nullable=False) # 1 o -1
+    descripcion = db.Column(db.String(255), nullable=True)
+    activo = db.Column(db.Boolean, default=True)
+
+class MovimientoInventario(db.Model):
+    __tablename__ = 'movimientos_inventario'
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Cantidad y Costo Histórico
+    cantidad = db.Column(db.Integer, nullable=False)
+    costo_unitario = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
+    stock_anterior = db.Column(db.Integer, nullable=False)
+    stock_nuevo = db.Column(db.Integer, nullable=False)
+    
+    # Trazabilidad Interna (Relacional)
+    referencia_tipo = db.Column(db.String(50), nullable=True, index=True)
+    referencia_id = db.Column(db.Integer, nullable=True, index=True)
+    
+    # Trazabilidad Externa (Documental)
+    documento_tipo = db.Column(db.String(50), nullable=True)
+    documento_numero = db.Column(db.String(100), nullable=True, index=True)
+    
+    motivo = db.Column(db.String(255), nullable=True)
+    fecha = db.Column(db.DateTime, default=obtener_hora_chile, index=True)
+    
+    # Llaves Foráneas
+    producto_id = db.Column(db.Integer, db.ForeignKey('productos.id', ondelete='RESTRICT'), nullable=False, index=True)
+    tipo_movimiento_id = db.Column(db.Integer, db.ForeignKey('tipos_movimiento_inventario.id', ondelete='RESTRICT'), nullable=False, index=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id', ondelete='RESTRICT'), nullable=False, index=True)
+    
+    # Relaciones
+    producto = db.relationship('Producto')
+    tipo_movimiento = db.relationship('TipoMovimientoInventario')
+    usuario = db.relationship('Usuario')
 
 # ==============================================================================
 # MÓDULO CLÍNICO (PACIENTES Y RECETAS)
@@ -142,8 +193,6 @@ class Paciente(db.Model):
     
     recetas = db.relationship('RecetaOftalmica', back_populates='paciente', cascade="all, delete-orphan")
     ordenes = db.relationship('OrdenTrabajo', back_populates='paciente')
-    
-    # NUEVA RELACIÓN: Historial de cotizaciones del paciente
     cotizaciones = db.relationship('Cotizacion', back_populates='paciente', cascade="all, delete-orphan")
 
 class RecetaProducto(db.Model):
@@ -188,13 +237,22 @@ class RecetaOftalmica(db.Model):
 # MÓDULO DE VENTAS / ÓRDENES DE TRABAJO
 # ==============================================================================
 
+class TipoOrdenTrabajo(db.Model):
+    __tablename__ = 'tipos_orden_trabajo'
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(50), unique=True, nullable=False)
+    descripcion = db.Column(db.String(255), nullable=True)
+    activo = db.Column(db.Boolean, default=True)
+    
 class OrdenTrabajo(db.Model):
-    """Reemplaza la antigua tabla 'ventas'"""
     __tablename__ = 'ordenes_trabajo'
     id = db.Column(db.Integer, primary_key=True)
     fecha_creacion = db.Column(db.DateTime, default=obtener_hora_chile, index=True)
     total = db.Column(db.Numeric(10, 2), nullable=False)
-    observaciones = db.Column(db.Text, nullable=True)
+    
+    # Llaves Foráneas Nuevas
+    tipo_orden_id = db.Column(db.Integer, db.ForeignKey('tipos_orden_trabajo.id', ondelete='RESTRICT'), nullable=False)
+    cotizacion_id = db.Column(db.Integer, db.ForeignKey('cotizaciones.id', ondelete='SET NULL'), nullable=True)
 
     # Auditoría Estándar
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id', ondelete='RESTRICT'), nullable=False, index=True)
@@ -211,14 +269,16 @@ class OrdenTrabajo(db.Model):
     receta = db.relationship('RecetaOftalmica', back_populates='ordenes')
     estado = db.relationship('EstadoOrden')
     metodo_pago = db.relationship('MetodoPago')
+    tipo_orden = db.relationship('TipoOrdenTrabajo')
+    cotizacion = db.relationship('Cotizacion', back_populates='ordenes')
     detalles = db.relationship('DetalleOrden', back_populates='orden', cascade="all, delete-orphan")
     
 class DetalleOrden(db.Model):
-    """Reemplaza la antigua tabla 'detalle_ventas'"""
     __tablename__ = 'detalles_orden'
     id = db.Column(db.Integer, primary_key=True)
     cantidad = db.Column(db.Integer, nullable=False)
     precio_unitario = db.Column(db.Numeric(10, 2), nullable=False)
+    descuento_aplicado = db.Column(db.Numeric(10, 2), nullable=False, default=0.00) # Nuevo para soportar 100% de descuento en Resolutividad
     subtotal = db.Column(db.Numeric(10, 2), nullable=False)
 
     orden_id = db.Column(db.Integer, db.ForeignKey('ordenes_trabajo.id', ondelete='CASCADE'), nullable=False, index=True)
@@ -258,6 +318,7 @@ class Cotizacion(db.Model):
     estado = db.relationship('EstadoCotizacion')
     usuario = db.relationship('Usuario')
     detalles = db.relationship('DetalleCotizacion', back_populates='cotizacion', cascade='all, delete-orphan')
+    ordenes = db.relationship('OrdenTrabajo', back_populates='cotizacion')
 
     @property
     def numero_formateado(self):
